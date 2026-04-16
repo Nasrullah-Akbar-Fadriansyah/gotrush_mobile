@@ -125,7 +125,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _orderSub?.cancel();
     final startToday = Timestamp.fromDate(_startOfToday());
     final endToday = Timestamp.fromDate(_endOfToday());
-    final Set<String> notifiedOrderIds = {};
+    // final Set<String> notifiedOrderIds = {};
 
     _orderSub = FirebaseFirestore.instance
         .collection('orders')
@@ -182,7 +182,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             });
             if (status == 'active' && _lastNavigatedOrderId != orderId) {
               _lastNavigatedOrderId = orderId; // Tandai sudah navigasi
-
               Navigator.of(context)
                   .push(
                     MaterialPageRoute(
@@ -196,14 +195,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             }
             if (_previousStatusPerOrder[orderId] != '$status|$paymentStatus') {
               _previousStatusPerOrder[orderId] = '$status|$paymentStatus';
-              if (status == 'active') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        OrderRoomScreen(orderId: orderId, role: 'driver'),
-                  ),
-                );
-              }
+              // if (status == 'active') {
+              //   Navigator.of(context).push(
+              //     MaterialPageRoute(
+              //       builder: (_) =>
+              //           OrderRoomScreen(orderId: orderId, role: 'driver'),
+              //     ),
+              //   );
+              // }
               if (paymentStatus == 'success') {
                 NotificationService().showLocal(
                   id: orderId.hashCode & 0x7fffffff,
@@ -280,8 +279,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _updateDriverLocation(String driverUid) async {
     try {
+      final LocationSettings locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: 10,
+      );
+
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: locationSettings,
       );
 
       final driverLocation = {
@@ -299,307 +303,333 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _showNewOrdersNotification() async {
-    if (!context.mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const SizedBox(width: 24), // Spacer for center alignment
-                    IconButton(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        if (mounted) {
-                          setState(() => _notificationShown = false);
-                        }
-                      },
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    'Ada orderan baru hari ini',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    if (mounted) {
-                      setState(() => _notificationShown = false);
-                    }
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const NewOrdersScreen(),
+    if (_showingDialog) return;
+    _showingDialog = true;
+    try {
+      if (!context.mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: false,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        builder: (ctx) {
+          return SafeArea(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const SizedBox(width: 24), // Spacer for center alignment
+                      IconButton(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          if (mounted) {
+                            setState(() => _notificationShown = false);
+                          }
+                        },
+                        icon: const Icon(Icons.close),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700],
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Text(
+                      'Ada orderan baru hari ini',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  child: const Center(
-                    child: Text('Lihat', style: TextStyle(color: Colors.white)),
+                  const SizedBox(height: 18),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      if (mounted) {
+                        setState(() => _notificationShown = false);
+                      }
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NewOrdersScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[700],
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Lihat',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    } finally {
+      // 🔄 RESET setelah dialog ditutup
+      if (mounted) {
+        setState(() {
+          _showingDialog = false;
+        });
+      }
+    }
   }
 
   Future<void> _promptAcceptOrder(
     String orderId,
     Map<String, dynamic> data,
   ) async {
-    if (!context.mounted) return;
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final driverId = auth.currentUser?.uid ?? '';
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      enableDrag: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: MediaQuery.of(ctx).viewInsets,
-          child: StatefulBuilder(
-            builder: (ctx2, setStateDialog) {
-              bool processing = false;
-              return SafeArea(
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 48,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          // animated icon
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0.0, end: 1.0),
-                            duration: const Duration(milliseconds: 450),
-                            builder: (context, val, child) {
-                              return Transform.scale(
-                                scale: 0.8 + 0.2 * val,
-                                child: child,
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withAlpha(
-                                  (0.12 * 255).round(),
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.local_shipping,
-                                color: Colors.green[700],
-                                size: 32,
-                              ),
+    if (_showingDialog) return; // 🔒 GUARD
+    _showingDialog = true;
+    try {
+      if (!context.mounted) return;
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final driverId = auth.currentUser?.uid ?? '';
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        enableDrag: false,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        builder: (ctx) {
+          return Padding(
+            padding: MediaQuery.of(ctx).viewInsets,
+            child: StatefulBuilder(
+              builder: (ctx2, setStateDialog) {
+                bool processing = false;
+                return SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 48,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(3),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            // animated icon
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 450),
+                              builder: (context, val, child) {
+                                return Transform.scale(
+                                  scale: 0.8 + 0.2 * val,
+                                  child: child,
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withAlpha(
+                                    (0.12 * 255).round(),
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.local_shipping,
+                                  color: Colors.green[700],
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Pesanan Baru',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${data['address'] ?? '-'}',
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Pesanan Baru',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Text(
+                                  'Jarak: ${data['distance'] ?? '-'} km',
+                                  style: const TextStyle(color: Colors.black54),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  '${data['address'] ?? '-'}',
-                                  style: const TextStyle(color: Colors.black87),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                  'Harga: ${data['price'] ?? '-'}',
+                                  style: const TextStyle(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Jarak: ${data['distance'] ?? '-'} km',
-                                style: const TextStyle(color: Colors.black54),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Harga: ${data['price'] ?? '-'}',
-                                style: const TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (data['eta'] != null)
-                            Chip(label: Text('${data['eta']}')),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(ctx2).pop();
-                                if (mounted) {
-                                  setState(() => _showingDialog = false);
-                                }
-                              },
-                              child: const Text('Tolak'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[700],
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              onPressed: () async {
-                                if (processing) return;
-                                setStateDialog(() => processing = true);
-                                try {
-                                  final accepted = await _orderService
-                                      .acceptOrder(orderId, driverId);
-                                  if (!mounted) return;
-                                  if (accepted) {
-                                    _orderSub?.cancel();
+                            if (data['eta'] != null)
+                              Chip(label: Text('${data['eta']}')),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  Navigator.of(ctx2).pop();
+                                  if (mounted) {
                                     setState(() => _showingDialog = false);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          if (!mounted) return;
-                                          setState(() {
-                                            _activeOrderId = orderId;
-                                            _activeOrderData = data;
-                                            _activeOrderData!['status'] =
-                                                'accepted';
-                                          });
-                                        });
-                                    await _updateDriverLocation(driverId);
+                                  }
+                                },
+                                child: const Text('Tolak'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green[700],
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  if (processing) return;
+                                  setStateDialog(() => processing = true);
+                                  try {
+                                    final accepted = await _orderService
+                                        .acceptOrder(orderId, driverId);
                                     if (!mounted) return;
-                                    showAppSnackBar(
-                                      context,
-                                      'Pesanan berhasil diterima',
-                                      type: AlertType.success,
-                                    );
-                                  } else {
-                                    if (!accepted) {
+                                    if (accepted) {
+                                      _orderSub?.cancel();
                                       setState(() => _showingDialog = false);
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _activeOrderId = orderId;
+                                              _activeOrderData = data;
+                                              _activeOrderData!['status'] =
+                                                  'accepted';
+                                            });
+                                          });
+                                      await _updateDriverLocation(driverId);
+                                      if (!mounted) return;
                                       showAppSnackBar(
                                         context,
-                                        'Gagal menerima: pesanan sudah diambil driver lain',
-                                        type: AlertType.error,
+                                        'Pesanan berhasil diterima',
+                                        type: AlertType.success,
+                                      );
+                                    } else {
+                                      if (!accepted) {
+                                        setState(() => _showingDialog = false);
+                                        showAppSnackBar(
+                                          context,
+                                          'Gagal menerima: pesanan sudah diambil driver lain',
+                                          type: AlertType.error,
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    if (!context.mounted) return;
+                                    setState(() => _showingDialog = false);
+                                    showAppSnackBar(
+                                      context,
+                                      'Gagal terima pesanan: $e',
+                                      type: AlertType.error,
+                                    );
+                                  } finally {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (ctx2.mounted) {
+                                            Navigator.of(ctx2).pop();
+                                          }
+                                        });
+                                    try {
+                                      setStateDialog(() => processing = false);
+                                    } catch (_) {}
+                                  }
+                                },
+                                child: Builder(
+                                  builder: (_) {
+                                    if (processing) {
+                                      return const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
                                       );
                                     }
-                                  }
-                                } catch (e) {
-                                  if (!context.mounted) return;
-                                  setState(() => _showingDialog = false);
-                                  showAppSnackBar(
-                                    context,
-                                    'Gagal terima pesanan: $e',
-                                    type: AlertType.error,
-                                  );
-                                } finally {
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    if (ctx2.mounted) {
-                                      Navigator.of(ctx2).pop();
-                                    }
-                                  });
-                                  try {
-                                    setStateDialog(() => processing = false);
-                                  } catch (_) {}
-                                }
-                              },
-                              child: Builder(
-                                builder: (_) {
-                                  if (processing) {
-                                    return const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
+                                    return const Text(
+                                      'Terima',
+                                      style: TextStyle(color: Colors.white),
                                     );
-                                  }
-                                  return const Text(
-                                    'Terima',
-                                    style: TextStyle(color: Colors.white),
-                                  );
-                                },
+                                  },
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
+                );
+              },
+            ),
+          );
+        },
+      );
+    } finally {
+      // 🔄 RESET setelah dialog ditutup
+      if (mounted) {
+        setState(() {
+          _showingDialog = false;
+        });
+      }
+    }
   }
 
   @override

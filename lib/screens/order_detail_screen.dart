@@ -28,14 +28,11 @@ Color _getStatusColor(String status) {
 
 extension ColorExtension on Color {
   Color withValues({double? alpha, double? red, double? green, double? blue}) {
-    final double finalAlphaDouble = (alpha ?? this.alpha / 255.0) * 255.0;
-
-    return Color.fromARGB(
-      finalAlphaDouble.round(),
-      red != null ? (red * 255).round() : this.red,
-      green != null ? (green * 255).round() : this.green,
-      blue != null ? (blue * 255).round() : this.blue,
-    );
+    final int finalAlpha = ((alpha ?? this.a) * 255).round();
+    final int finalRed = ((red ?? this.r) * 255).round();
+    final int finalGreen = ((green ?? this.g) * 255).round();
+    final int finalBlue = ((blue ?? this.b) * 255).round();
+    return Color.fromARGB(finalAlpha, finalRed, finalGreen, finalBlue);
   }
 }
 
