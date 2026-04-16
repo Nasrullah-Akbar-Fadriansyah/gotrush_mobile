@@ -61,6 +61,7 @@ class _DriverProfileState extends State<DriverProfile> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(
         context,
         'Gagal memuat data profil: $e',
@@ -129,13 +130,14 @@ class _DriverProfileState extends State<DriverProfile> {
           "phone": _phoneController.text.trim(),
         },
       );
-
+      if (!mounted) return;
       showAppSnackBar(
         context,
         "Profil berhasil diperbarui",
         type: AlertType.success,
       );
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(context, "Gagal memperbarui: $e", type: AlertType.error);
     } finally {
       setState(() => _isUpdatingProfile = false);
@@ -153,11 +155,13 @@ class _DriverProfileState extends State<DriverProfile> {
     if (_currentPasswordController.text.isEmpty ||
         _newPasswordController.text.isEmpty ||
         _confirmPasswordController.text.isEmpty) {
+      if (!mounted) return;
       showAppSnackBar(context, "Semua field wajib diisi");
       return;
     }
     if (_newPasswordController.text.trim() !=
         _confirmPasswordController.text.trim()) {
+      if (!mounted) return;
       showAppSnackBar(context, "Password baru tidak sama");
       return;
     }
@@ -170,6 +174,7 @@ class _DriverProfileState extends State<DriverProfile> {
       );
       await user.reauthenticateWithCredential(cred);
       await user.updatePassword(_newPasswordController.text.trim());
+      if (!mounted) return;
       showAppSnackBar(
         context,
         "Password berhasil diganti",
@@ -180,6 +185,7 @@ class _DriverProfileState extends State<DriverProfile> {
       _confirmPasswordController.clear();
       setState(() => _showPasswordFields = false);
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(
         context,
         "Gagal mengubah password: $e",

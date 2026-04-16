@@ -60,7 +60,7 @@ class PickupScheduleScreen extends StatelessWidget {
                 (order) =>
                     order.pickupDate != null &&
                     order.pickupDate!.isAfter(
-                      DateTime.now().subtract(Duration(days: 1)),
+                      DateTime.now().subtract(const Duration(days: 1)),
                     ),
               )
               .toList();

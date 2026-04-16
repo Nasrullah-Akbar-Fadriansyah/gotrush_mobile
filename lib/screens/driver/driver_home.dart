@@ -32,7 +32,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   String? _previousStatus;
   Timestamp? _lastLoginAt;
   bool _checkedInitialOrders = false;
-  Map<String, String> _previousStatusPerOrder = {};
+  final Map<String, String> _previousStatusPerOrder = {};
   String? _lastNavigatedOrderId;
   DateTime _startOfToday() {
     final now = DateTime.now();
@@ -254,7 +254,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _onDepartPressed() async {
     if (_activeOrderId == null || _activeOrderData == null) return;
-    final GeoPoint defaultLocation = const GeoPoint(-6.1900, 106.7969);
+    const GeoPoint defaultLocation = GeoPoint(-6.1900, 106.7969);
     final GeoPoint pickupLocation =
         _activeOrderData!['location'] as GeoPoint? ?? defaultLocation;
     try {
@@ -279,7 +279,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _updateDriverLocation(String driverUid) async {
     try {
-      final LocationSettings locationSettings = const LocationSettings(
+      const LocationSettings locationSettings = LocationSettings(
         accuracy: LocationAccuracy.medium,
         distanceFilter: 10,
       );
@@ -298,7 +298,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           .doc(driverUid)
           .set(driverLocation, SetOptions(merge: true));
     } catch (e) {
-      print('Gagal update lokasi driver: $e');
+      debugPrint('Gagal update lokasi driver: $e');
     }
   }
 
@@ -337,10 +337,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Center(
+                  const Center(
                     child: Text(
                       'Ada orderan baru hari ini',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -634,7 +634,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String driverName = "Driver";
+    const String driverName = "Driver";
     final auth = Provider.of<AuthService>(context, listen: false);
     final currentUserId = auth.currentUser?.uid ?? '';
 
@@ -681,10 +681,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       "Hai, $driverName 👋\nSiap menjalankan tugas hari ini?",
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         height: 1.4,
@@ -747,7 +747,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         builder: (_) => Scaffold(
                           appBar: AppBar(
                             backgroundColor: Colors.green[800],
-                            title: Text(
+                            title: const Text(
                               'Riwayat',
                               style: TextStyle(
                                 color: Colors.white,

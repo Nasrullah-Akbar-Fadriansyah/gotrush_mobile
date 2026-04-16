@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       decoration: InputDecoration(
                         labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -204,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(Icons.lock_outline),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

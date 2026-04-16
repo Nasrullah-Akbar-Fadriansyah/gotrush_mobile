@@ -150,6 +150,7 @@ class _NewOrdersScreenState extends State<NewOrdersScreen> {
                                 final accepted = await _orderService
                                     .acceptOrder(orderId, driverId);
                                 if (!mounted) return;
+                                if (!context.mounted) return;
                                 showAppSnackBar(
                                   context,
                                   accepted
@@ -160,6 +161,7 @@ class _NewOrdersScreenState extends State<NewOrdersScreen> {
                                       : AlertType.error,
                                 );
                                 if (accepted) {
+                                  if (!context.mounted) return;
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => OrderRoomScreen(

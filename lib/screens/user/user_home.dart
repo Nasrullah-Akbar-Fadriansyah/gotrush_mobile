@@ -228,6 +228,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         );
         if (_dialogOpen) return;
         _dialogOpen = true;
+        if (!mounted) return;
         showAppDialog(
           context,
           title: 'Selesai',
@@ -265,13 +266,13 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     final nameCtl = TextEditingController();
     final phoneCtl = TextEditingController();
     DateTime? selectedDate;
-
+    if (!mounted) return;
     final auth = Provider.of<AuthService>(context, listen: false);
     final currentUser = auth.currentUser;
     if (currentUser != null) {
       nameCtl.text = currentUser.displayName ?? '';
     }
-
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -284,8 +285,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           }
 
           return AlertDialog(
-            title: Row(
-              children: const [
+            title: const Row(
+              children: [
                 Icon(Icons.add_location_alt, color: Colors.green),
                 SizedBox(width: 8),
                 Expanded(child: Text('Buat Order Penjemputan')),
@@ -408,7 +409,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                     );
                     return;
                   }
-
+                  if (!context.mounted) return;
                   Navigator.of(ctx).pop();
                   if (!mounted) return;
                   showAppSnackBar(
@@ -491,6 +492,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       );
 
       if (snapUrl != null) {
+        if (!mounted) return;
         final result = await Navigator.of(context).push<Map<String, dynamic>>(
           MaterialPageRoute(
             builder: (_) =>
@@ -506,13 +508,14 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 'payment_status': 'success',
                 'status': 'pickup_validation',
               });
-
+          if (!mounted) return;
           showAppSnackBar(
             context,
             'Pembayaran berhasil!',
             type: AlertType.success,
           );
         } else {
+          if (!mounted) return;
           showAppSnackBar(
             context,
             'Pembayaran dibatalkan.',
@@ -520,6 +523,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           );
         }
       } else {
+        if (!mounted) return;
         showAppSnackBar(
           context,
           'Gagal memulai pembayaran.',
@@ -527,6 +531,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(context, 'Error: $e', type: AlertType.error);
     }
   }
@@ -541,7 +546,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           .collection('orders')
           .doc(orderId)
           .update({'status': 'user_confirmed_pickup'});
-
+      if (!mounted) return;
       showAppSnackBar(
         context,
         'Order dikonfirmasi selesai!',
@@ -553,6 +558,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         _activeOrderData = null;
       });
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(
         context,
         'Gagal mengkonfirmasi: $e',

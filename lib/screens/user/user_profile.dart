@@ -68,6 +68,7 @@ class _UserProfileState extends State<UserProfile> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(
         context,
         'Gagal memuat data profil: $e',
@@ -141,6 +142,7 @@ class _UserProfileState extends State<UserProfile> {
           "phone": _phoneController.text.trim(),
         },
       );
+      if (!mounted) return;
 
       showAppSnackBar(
         context,
@@ -148,6 +150,7 @@ class _UserProfileState extends State<UserProfile> {
         type: AlertType.success,
       );
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(context, "Gagal memperbarui: $e", type: AlertType.error);
     } finally {
       setState(() => _isUpdatingProfile = false);
@@ -167,12 +170,14 @@ class _UserProfileState extends State<UserProfile> {
     if (_currentPasswordController.text.isEmpty ||
         _newPasswordController.text.isEmpty ||
         _confirmPasswordController.text.isEmpty) {
+      if (!mounted) return;
       showAppSnackBar(context, "Semua field wajib diisi");
       return;
     }
 
     if (_newPasswordController.text.trim() !=
         _confirmPasswordController.text.trim()) {
+      if (!mounted) return;
       showAppSnackBar(context, "Password baru tidak sama");
       return;
     }
@@ -185,21 +190,20 @@ class _UserProfileState extends State<UserProfile> {
         email: user.email!,
         password: _currentPasswordController.text.trim(),
       );
-
       await user.reauthenticateWithCredential(cred);
       await user.updatePassword(_newPasswordController.text.trim());
-
+      if (!mounted) return;
       showAppSnackBar(
         context,
         "Password berhasil diganti",
         type: AlertType.success,
       );
-
       _currentPasswordController.clear();
       _newPasswordController.clear();
       _confirmPasswordController.clear();
       setState(() => _showPasswordFields = false);
     } catch (e) {
+      if (!mounted) return;
       showAppSnackBar(
         context,
         "Gagal mengubah password: $e",

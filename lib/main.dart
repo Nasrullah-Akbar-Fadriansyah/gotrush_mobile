@@ -21,7 +21,7 @@ void main() async {
     await initializeDateFormatting('id_ID', null);
     Intl.defaultLocale = 'id_ID';
   } catch (e) {
-    print("Error initializing locale: $e");
+    debugPrint("Error initializing locale: $e");
   }
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

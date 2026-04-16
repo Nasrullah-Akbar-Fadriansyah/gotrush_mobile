@@ -95,8 +95,8 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
           // 1. Peta OSMFlutter
           osm.OSMFlutter(
             controller: _mapController,
-            osmOption: osm.OSMOption(
-              zoomOption: const osm.ZoomOption(initZoom: 15),
+            osmOption: const osm.OSMOption(
+              zoomOption: osm.ZoomOption(initZoom: 15),
             ),
             onMapIsReady: (isReady) async {
               if (isReady && mounted) {

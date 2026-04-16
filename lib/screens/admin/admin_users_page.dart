@@ -80,6 +80,7 @@ class AdminUsersPage extends StatelessWidget {
                           );
                           if (confirm == true) {
                             await _softDeleteUser(d.id);
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Akun diupdate')),
                             );
@@ -118,6 +119,7 @@ class AdminUsersPage extends StatelessWidget {
                                 .collection('users')
                                 .doc(d.id)
                                 .delete();
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Dokumen user dihapus'),

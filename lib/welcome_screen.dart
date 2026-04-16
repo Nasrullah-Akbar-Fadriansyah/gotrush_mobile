@@ -45,7 +45,7 @@ class WelcomeScreen extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 31,
                       fontWeight: FontWeight.bold,
-                      color: Color.fromARGB(222, 0, 0, 0),
+                      color: const Color.fromARGB(222, 0, 0, 0),
                     ),
                     textAlign: TextAlign.center,
                   ),

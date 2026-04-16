@@ -89,7 +89,7 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: Text(
           'Chat dengan ${widget.otherUserName}',
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.green[700],
       ),

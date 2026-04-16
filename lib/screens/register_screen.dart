@@ -78,7 +78,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             message = ex.message ?? ex.toString();
           }
         }
-      } catch (e) {}
+      } catch (err) {
+        // fallback jika parsing gagal total
+        message = 'Terjadi kesalahan tidak diketahui';
+        debugPrint('Parsing error: $err');
+      }
 
       if (mounted) {
         showAppSnackBar(
