@@ -18,25 +18,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin(AuthService auth) async {
     setState(() => isLoading = true);
-
     try {
-      final userCredential = await auth.login(email.trim(), password);
+      final targetEmail = email.trim().toLowerCase();
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: targetEmail)
+          .get();
+      if (userQuery.docs.isEmpty) {
+        await _showErrorDialog(
+          title: 'Login Gagal',
+          message:
+              'Email yang Anda masukkan belum terdaftar. Silakan daftar terlebih dahulu.',
+          actionLabel: 'Daftar',
+          action: () => Navigator.pushNamed(context, '/register'),
+        );
+        return;
+      }
+      final userCredential = await auth.login(targetEmail, password);
       final uid = userCredential?.user?.uid;
+
       if (uid != null) {
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
             .get();
-        if (!doc.exists) {
-          await _showErrorDialog(
-            title: 'Akun tidak ditemukan',
-            message:
-                'Data pengguna tidak ditemukan di database. Ingin mendaftar?',
-            actionLabel: 'Daftar',
-            action: () => Navigator.pushNamed(context, '/register'),
-          );
-          return;
-        }
 
         final role = doc.data()?['role'] as String?;
         if (role == 'driver') {
@@ -50,37 +55,37 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacementNamed(context, '/admin');
         } else {
           await _showErrorDialog(
-            title: 'Akses ditolak',
-            message:
-                'Akun ini tidak memiliki role yang valid. Ingin mendaftar ulang?',
-            actionLabel: 'Daftar',
-            action: () => Navigator.pushNamed(context, '/register'),
+            title: 'Akses Ditolak',
+            message: 'Akun ini tidak memiliki role yang valid.',
           );
-          return;
         }
       }
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
+        case 'invalid-credential':
         case 'wrong-password':
-          message = 'Password tidak ada, coba masukkan ulang';
-        case 'user-not-found':
-          message = 'Email belum terdaftar. Coba daftar terlebih dahulu.';
+          message = 'Password yang Anda masukkan salah. Silakan coba kembali.';
+          break;
         case 'user-disabled':
-          message = 'Akun dinonaktifkan. Hubungi admin.';
+          message = 'Akun Anda telah dinonaktifkan oleh admin.';
+          break;
         case 'too-many-requests':
-          message = 'Terlalu banyak percobaan. Coba lagi nanti.';
+          message =
+              'Terlalu banyak percobaan login yang gagal. Coba lagi nanti.';
+          break;
         case 'invalid-email':
-          message = 'Format email tidak valid.';
+          message = 'Format penulisan email tidak valid.';
+          break;
         case 'network-request-failed':
-          message = 'Gagal terhubung ke jaringan. Periksa koneksi internetmu.';
+          message = 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
+          break;
         default:
-          message = 'Login gagal: ${e.message ?? e.code}';
+          message = 'Terjadi kesalahan: ${e.message ?? e.code}';
       }
-
-      await _showErrorDialog(title: 'Login gagal', message: message);
+      await _showErrorDialog(title: 'Login Gagal', message: message);
     } catch (e) {
-      await _showErrorDialog(title: 'Login gagal', message: e.toString());
+      await _showErrorDialog(title: 'Login Gagal', message: e.toString());
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -96,31 +101,114 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return showDialog<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red),
-            const SizedBox(width: 8),
-            Flexible(child: Text(title)),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          if (actionLabel != null && action != null)
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                action();
-              },
-              icon: const Icon(Icons.login),
-              label: Text(actionLabel),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Tutup'),
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Ikon Error Melingkar yang Cantik
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Judul Dialog
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Deskripsi Pesan Error
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Area Tombol Aksi
+              Column(
+                children: [
+                  if (actionLabel != null && action != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[700],
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          action();
+                        },
+                        icon: const Icon(Icons.login, size: 18),
+                        label: Text(
+                          actionLabel,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.grey[700],
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text(
+                        'Tutup',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

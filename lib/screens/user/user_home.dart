@@ -1,154 +1,66 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
-import 'package:sampah_online/screens/user/edukasi_screen.dart';
-import 'package:sampah_online/screens/user/user_profile.dart';
 import '../../services/auth_service.dart';
-import '../../services/order_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/order_service.dart';
 import '../../utils/alerts.dart';
-import '../../payment.dart';
-import '../../midtrans_payment_webview.dart';
+import '../order_room_screen.dart';
+import '../user/edukasi_screen.dart';
+import '../user/pickup_schedule_screen.dart';
+import '../user/user_profile.dart';
 import '../order_history_widget.dart';
 import '../map_selection_screen.dart';
-import '../chat_screen.dart';
-import '../order_room_screen.dart';
-import 'pickup_schedule_screen.dart';
+import 'package:flutter/services.dart';
 
-class UserHomeScreen extends StatefulWidget {
-  const UserHomeScreen({super.key});
+class UserHome extends StatefulWidget {
+  const UserHome({super.key});
+
   @override
-  State<UserHomeScreen> createState() => _UserHomeScreenState();
+  State<UserHome> createState() => _UserHomeState();
 }
 
-class _UserHomeScreenState extends State<UserHomeScreen> {
-  final OrderService _orderService = OrderService();
-  StreamSubscription<firestore.QuerySnapshot>? _orderSub;
-  bool _dialogOpen = false;
+class _UserHomeState extends State<UserHome> {
   DateTime? _lastNotifyAt;
   String? _lastNotifiedOrderId;
-  Map<String, dynamic>? _activeOrderData;
-  String? _activeOrderId;
-  final Map<String, String?> _orderStatuses = {};
-  final Map<String, String?> _paymentStatuses = {};
+  bool _dialogOpen = false;
 
-  final firestore.GeoPoint _monasLocation = const firestore.GeoPoint(
-    -6.175392,
-    106.827153,
-  );
+  final Set<String> _orderStatuses = <String>{};
 
-  static const double _pricePerKm = 1000;
-  static const double _pricePerKg = 1000;
+  late final OrderService _orderService;
+
+  final double _pricePerKm = 1000;
+  final double _pricePerKg = 1000;
+
+  // Default base location (Monas, Jakarta) for distance calculation.
+  // If your project already has another util, we can swap later.
+  final LatLng _monasLocation = const LatLng(-6.1754, 106.8272);
 
   @override
   void initState() {
     super.initState();
-    _subscribeOrderStream();
+    _orderService = OrderService();
   }
 
-  @override
-  void dispose() {
-    _orderSub?.cancel();
-    super.dispose();
-  }
+  double _calculateDistance(LatLng a, LatLng b) {
+    // Haversine formula
+    const earthRadiusKm = 6371.0;
+    final dLat = (b.latitude - a.latitude) * (math.pi / 180.0);
+    final dLon = (b.longitude - a.longitude) * (math.pi / 180.0);
+    final lat1 = a.latitude * (math.pi / 180.0);
+    final lat2 = b.latitude * (math.pi / 180.0);
 
-  void _subscribeOrderStream() {
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final uid = auth.currentUser?.uid;
-    if (uid == null) return;
-
-    bool isInitialLoad = true;
-
-    _orderSub = firestore.FirebaseFirestore.instance
-        .collection('orders')
-        .where(
-          'status',
-          whereIn: [
-            'pending',
-            'active',
-            'awaiting_confirmation',
-            'waiting_payment',
-            'arrived',
-            'waiting_user_validation',
-            'picked_up',
-            'completed',
-          ],
-        )
-        .snapshots()
-        .listen(
-          (snap) {
-            if (isInitialLoad) {
-              for (var doc in snap.docs) {
-                final data = doc.data();
-                if (data['user_id'] != uid) continue;
-
-                _orderStatuses[doc.id] = data['status'] as String?;
-                _paymentStatuses[doc.id] = data['payment_status'] as String?;
-              }
-              isInitialLoad = false;
-              return;
-            }
-
-            for (var doc in snap.docs) {
-              final data = doc.data();
-              if (data['user_id'] != uid) continue;
-
-              final orderId = doc.id;
-              final status = data['status'] as String?;
-              final payment = data['payment_status'] as String?;
-
-              final prevStatus = _orderStatuses[orderId];
-              final prevPayment = _paymentStatuses[orderId];
-
-              if (prevStatus == status && prevPayment == payment) continue;
-
-              _orderStatuses[orderId] = status;
-              _paymentStatuses[orderId] = payment;
-
-              if (status == 'completed' && prevStatus != 'completed') {
-                NotificationService().showLocal(
-                  id: orderId.hashCode & 0x7fffffff,
-                  title: 'Pesanan Selesai',
-                  body: 'Pesanan kamu telah diselesaikan driver',
-                );
-
-                setState(() {
-                  _activeOrderId = null;
-                  _activeOrderData = null;
-                });
-              }
-              _handleStatusChange(
-                orderId,
-                status ?? '',
-                Map<String, dynamic>.from(data),
-              );
-            }
-          },
-          onError: (e) {
-            debugPrint('Order subscription error: $e');
-          },
-        );
-  }
-
-  double _calculateDistance(firestore.GeoPoint a, firestore.GeoPoint b) {
-    const R = 6371; // km
-    final lat1 = a.latitude * (math.pi / 180);
-    final lon1 = a.longitude * (math.pi / 180);
-    final lat2 = b.latitude * (math.pi / 180);
-    final lon2 = b.longitude * (math.pi / 180);
-    final dlat = lat2 - lat1;
-    final dlon = lon2 - lon1;
-    final aa =
-        math.sin(dlat / 2) * math.sin(dlat / 2) +
+    final h =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(lat1) *
             math.cos(lat2) *
-            math.sin(dlon / 2) *
-            math.sin(dlon / 2);
-    final c = 2 * math.atan2(math.sqrt(aa), math.sqrt(1 - aa));
-    return R * c; // km
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(h), math.sqrt(1 - h));
+    return earthRadiusKm * c;
   }
 
   Future<void> _handleStatusChange(
@@ -157,6 +69,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     Map<String, dynamic> data,
   ) async {
     if (!mounted) return;
+
     final now = DateTime.now();
     if (_lastNotifyAt != null && _lastNotifiedOrderId == orderId) {
       final diff = now.difference(_lastNotifyAt!);
@@ -169,17 +82,15 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       context,
       listen: false,
     );
-    final paymentStatus = data['payment_status'];
 
     switch (status) {
       case 'active':
-        if (mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => OrderRoomScreen(orderId: orderId, role: 'user'),
-            ),
-          );
-        }
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => OrderRoomScreen(orderId: orderId, role: 'user'),
+          ),
+        );
         break;
 
       case 'pickup_validation':
@@ -188,10 +99,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           title: 'Validasi Pengambilan',
           body: 'Silakan lakukan validasi akhir setelah driver konfirmasi.',
         );
-        setState(() {
-          _activeOrderId = orderId;
-          _activeOrderData = data;
-        });
         break;
 
       case 'waiting_user_validation':
@@ -201,10 +108,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           body:
               'Driver mengonfirmasi pengambilan. Apakah sampah sudah diambil?',
         );
-        setState(() {
-          _activeOrderId = orderId;
-          _activeOrderData = data;
-        });
         break;
 
       case 'arrived':
@@ -213,10 +116,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           title: 'Driver Tiba di Lokasi',
           body: 'Driver telah tiba. Siapkan sampah anda.',
         );
-        setState(() {
-          _activeOrderId = orderId;
-          _activeOrderData = data;
-        });
         break;
 
       case 'completed':
@@ -226,21 +125,26 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           title: 'Pesanan Selesai',
           body: 'Terima kasih! Sampah telah diambil.',
         );
+
         if (_dialogOpen) return;
         _dialogOpen = true;
         if (!mounted) return;
-        showAppDialog(
+
+        await showAppDialog(
           context,
           title: 'Selesai',
           message: 'Terima kasih! Sampah telah diambil.',
           type: AlertType.success,
-        ).then((_) {
-          if (mounted) setState(() => _dialogOpen = false);
-        });
-        setState(() {
-          _activeOrderId = null;
-          _activeOrderData = null;
-        });
+        );
+
+        if (mounted) {
+          setState(() => _dialogOpen = false);
+        } else {
+          _dialogOpen = false;
+        }
+        break;
+
+      default:
         break;
     }
   }
@@ -252,11 +156,15 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
 
     if (result == null) return;
 
-    final firestore.GeoPoint selectedLocation =
-        result['location'] as firestore.GeoPoint;
+    final GeoPoint selectedLocation = result['location'] as GeoPoint;
     final String selectedAddress = result['address'] as String;
 
-    final distanceKm = _calculateDistance(_monasLocation, selectedLocation);
+    final selected = LatLng(
+      selectedLocation.latitude,
+      selectedLocation.longitude,
+    );
+    final distanceKm = _calculateDistance(_monasLocation, selected);
+
     final addressCtl = TextEditingController(text: selectedAddress);
     final distanceCtl = TextEditingController(
       text: distanceKm.toStringAsFixed(2),
@@ -266,18 +174,18 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     final nameCtl = TextEditingController();
     final phoneCtl = TextEditingController();
     DateTime? selectedDate;
-    if (!mounted) return;
+
     final auth = Provider.of<AuthService>(context, listen: false);
     final currentUser = auth.currentUser;
     if (currentUser != null) {
       nameCtl.text = currentUser.displayName ?? '';
     }
-    if (!mounted) return;
+
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setStateDialog) {
-          void _updatePrice() {
+          void updatePrice() {
             final distance = double.tryParse(distanceCtl.text) ?? 0;
             final weight = double.tryParse(weightCtl.text) ?? 0;
             final price = (distance * _pricePerKm) + (weight * _pricePerKg);
@@ -301,15 +209,20 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                   ),
                   TextField(
                     controller: distanceCtl,
-                    decoration: const InputDecoration(labelText: 'Jarak (km)'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => _updatePrice(),
+                    readOnly: true,
+                    enabled: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Jarak (km x Rp.1000)',
+                    ),
                   ),
                   TextField(
                     controller: weightCtl,
-                    decoration: const InputDecoration(labelText: 'Berat (kg)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Berat (kg x Rp.1000)',
+                    ),
                     keyboardType: TextInputType.number,
-                    onChanged: (_) => _updatePrice(),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (_) => updatePrice(),
                   ),
                   TextField(
                     controller: priceCtl,
@@ -367,21 +280,15 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                   final phoneNumber = phoneCtl.text.trim();
 
                   if (address.isEmpty || name.isEmpty || phoneNumber.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Alamat, nama, dan nomor telepon harus diisi',
-                        ),
-                        backgroundColor: Colors.red,
-                      ),
+                    showAppSnackBar(
+                      context,
+                      'Alamat, nama, dan nomor telepon harus diisi',
+                      type: AlertType.error,
                     );
                     return;
                   }
 
-                  final auth = Provider.of<AuthService>(context, listen: false);
                   final uid = auth.currentUser?.uid ?? '';
-                  final email = auth.currentUser?.email ?? 'user@example.com';
-
                   final orderId =
                       'ORDER_${DateTime.now().millisecondsSinceEpoch}_$uid';
 
@@ -401,7 +308,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                       phoneNumber: phoneNumber,
                     );
                   } catch (e) {
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     showAppSnackBar(
                       context,
                       'Gagal menyimpan order: $e',
@@ -409,9 +316,11 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                     );
                     return;
                   }
-                  if (!context.mounted) return;
+
+                  if (!ctx2.mounted) return;
                   Navigator.of(ctx).pop();
-                  if (!mounted) return;
+                  if (!context.mounted) return;
+
                   showAppSnackBar(
                     context,
                     'Pesanan disimpan. Menunggu driver menerima.',
@@ -425,146 +334,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         },
       ),
     );
-  }
-
-  Future<void> _saveOrderToFirestore({
-    required String address,
-    required double distance,
-    required double weight,
-    required double price,
-    required firestore.GeoPoint location,
-    required String name,
-    required String phoneNumber,
-    String status = 'pending',
-  }) async {
-    try {
-      final auth = Provider.of<AuthService>(context, listen: false);
-      final uid = auth.currentUser?.uid;
-      if (uid == null) throw Exception('User belum login');
-      final String orderId = DateTime.now().millisecondsSinceEpoch.toString();
-      await _orderService.createOrder(
-        orderId: orderId,
-        userId: uid,
-        weight: weight,
-        distance: distance,
-        price: price,
-        address: address,
-        location: location,
-        photoUrls: [],
-        status: status,
-        name: name,
-        phoneNumber: phoneNumber,
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pesanan berhasil disimpan ke riwayat!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal menyimpan pesanan: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _handlePayment() async {
-    if (_activeOrderId == null || _activeOrderData == null) return;
-
-    final orderId = _activeOrderId!;
-    final price = (_activeOrderData!['price'] ?? 0).toDouble();
-    final name = _activeOrderData!['name'] as String? ?? '';
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final email = auth.currentUser?.email ?? 'user@example.com';
-
-    try {
-      final snapUrl = await getMidtransSnapUrl(
-        orderId: orderId,
-        grossAmount: price.toInt(),
-        name: name,
-        email: email,
-      );
-
-      if (snapUrl != null) {
-        if (!mounted) return;
-        final result = await Navigator.of(context).push<Map<String, dynamic>>(
-          MaterialPageRoute(
-            builder: (_) =>
-                MidtransPaymentWebView(snapUrl: snapUrl, orderId: orderId),
-          ),
-        );
-
-        if (result?['status'] == 'success') {
-          await firestore.FirebaseFirestore.instance
-              .collection('orders')
-              .doc(orderId)
-              .update({
-                'payment_status': 'success',
-                'status': 'pickup_validation',
-              });
-          if (!mounted) return;
-          showAppSnackBar(
-            context,
-            'Pembayaran berhasil!',
-            type: AlertType.success,
-          );
-        } else {
-          if (!mounted) return;
-          showAppSnackBar(
-            context,
-            'Pembayaran dibatalkan.',
-            type: AlertType.info,
-          );
-        }
-      } else {
-        if (!mounted) return;
-        showAppSnackBar(
-          context,
-          'Gagal memulai pembayaran.',
-          type: AlertType.error,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      showAppSnackBar(context, 'Error: $e', type: AlertType.error);
-    }
-  }
-
-  Future<void> _handleConfirmation() async {
-    if (_activeOrderId == null) return;
-
-    final orderId = _activeOrderId!;
-
-    try {
-      await firestore.FirebaseFirestore.instance
-          .collection('orders')
-          .doc(orderId)
-          .update({'status': 'user_confirmed_pickup'});
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        'Order dikonfirmasi selesai!',
-        type: AlertType.success,
-      );
-
-      setState(() {
-        _activeOrderId = null;
-        _activeOrderData = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        'Gagal mengkonfirmasi: $e',
-        type: AlertType.error,
-      );
-    }
   }
 
   final List<Map<String, Object>> menuItems = [
@@ -710,6 +479,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   Widget _buildDynamicFab() {
     final auth = Provider.of<AuthService>(context, listen: false);
     final uid = auth.currentUser?.uid;
+
     final createBtn = Expanded(
       child: ElevatedButton.icon(
         onPressed: _startCreateOrderFlow,
@@ -732,6 +502,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         ),
       ),
     );
+
     if (uid == null) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -749,8 +520,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       'picked_up',
     ];
 
-    return StreamBuilder<firestore.QuerySnapshot<Map<String, dynamic>>>(
-      stream: firestore.FirebaseFirestore.instance
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
           .collection('orders')
           .where('user_id', isEqualTo: uid)
           .where('archived', isEqualTo: false)
@@ -760,6 +531,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       builder: (context, snapshot) {
         final hasActive = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
         Widget? activeBtn;
+
         if (hasActive) {
           final orderId = snapshot.data!.docs.first.id;
           activeBtn = Expanded(
@@ -1048,4 +820,10 @@ class _ActiveOrderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class LatLng {
+  final double latitude;
+  final double longitude;
+  const LatLng(this.latitude, this.longitude);
 }

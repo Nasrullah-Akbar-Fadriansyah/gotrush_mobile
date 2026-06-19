@@ -1,0 +1,70 @@
+@startuml sequence
+' Sequence diagram untuk alur order utama
+
+title Sequence Diagram End-to-End Order (GoTrash)
+
+actor User
+actor Driver
+participant "UserApp" as UA
+participant "DriverApp" as DA
+participant "PaymentApi" as PayApi
+participant "Midtrans" as Midtrans
+participant "Midtrans WebView" as WebView
+database "Firestore" as DB
+
+User -> UA: buat order (lokasi, detail, tanggal)
+UA -> DB: create orders (status=pending)
+UA -> DB: create order_history (initial)
+
+DA -> DB: listen orders (pending)
+DB --> DA: snapshot order baru
+
+Driver -> DA: terima order
+DA -> DB: status=active, driver_id, accepted_at
+
+Driver -> DA: input berat
+DA -> DB: driver_weight, weight_status=proposed,
+DA -> DB: status=awaiting_confirmation
+
+User -> UA: setuju berat
+UA -> DB: final_weight, price, status=waiting_payment
+
+User -> UA: bayar
+UA -> PayApi: request snap_url
+PayApi -> Midtrans: create transaction
+Midtrans --> PayApi: redirect_url
+UA -> WebView: buka redirect_url
+WebView -> UA: payment finish callback
+UA -> DB: payment_status=success,
+UA -> DB: status=pickup_validation
+
+Driver -> DA: tiba di lokasi
+DA -> DB: status=arrived
+
+Driver -> DA: konfirmasi ambil
+DA -> DB: status=waiting_user_validation
+
+User -> UA: validasi pengambilan (ya)
+UA -> DB: status=picked_up
+
+Driver -> DA: selesaikan order
+DA -> DB: status=completed, archived
+DA -> DB: update order_history
+
+opt Chat
+  User -> UA: kirim pesan
+  UA -> DB: orders/{orderId}/messages
+  DB --> DA: snapshot pesan baru
+end
+
+alt User sanggah berat
+  User -> UA: sanggah berat
+  UA -> DB: weight_status=disputed, status=active
+  Driver -> DA: koreksi dan ajukan ulang
+end
+
+alt Pembayaran gagal atau dibatalkan
+  WebView -> UA: error/cancel
+  UA -> DB: status tetap waiting_payment
+end
+@enduml

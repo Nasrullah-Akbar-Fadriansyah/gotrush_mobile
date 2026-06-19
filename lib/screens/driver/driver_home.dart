@@ -7,13 +7,10 @@ import 'package:sampah_online/screens/driver/new_orders_screen.dart';
 import 'package:sampah_online/welcome_screen.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import '../../services/order_service.dart';
 import '../../services/auth_service.dart';
-import '../../utils/alerts.dart';
 import '../../services/notification_service.dart';
 import '../order_history_widget.dart';
 import '../order_room_screen.dart';
-import 'driver_map_tracking_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -22,16 +19,12 @@ class DriverHomeScreen extends StatefulWidget {
 }
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
-  final OrderService _orderService = OrderService();
   StreamSubscription<QuerySnapshot>? _orderSub;
   Timer? _locationUpdateTimer;
   bool _showingDialog = false;
   bool _notificationShown = false;
   Map<String, dynamic>? _activeOrderData;
   String? _activeOrderId;
-  String? _previousStatus;
-  Timestamp? _lastLoginAt;
-  bool _checkedInitialOrders = false;
   final Map<String, String> _previousStatusPerOrder = {};
   String? _lastNavigatedOrderId;
   DateTime _startOfToday() {
@@ -47,8 +40,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _loadLastLogin();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _startListeningAndTracking();
     });
   }
@@ -104,19 +96,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Future<void> _loadLastLogin() async {
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final uid = auth.currentUser?.uid;
-    if (uid == null) return;
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .get();
-
-    _lastLoginAt = doc.data()?['last_login_at'] as Timestamp?;
-  }
-
   Future<void> _startListeningAndTracking() async {
     final auth = Provider.of<AuthService>(context, listen: false);
     final driverUid = auth.currentUser?.uid;
@@ -125,7 +104,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _orderSub?.cancel();
     final startToday = Timestamp.fromDate(_startOfToday());
     final endToday = Timestamp.fromDate(_endOfToday());
-    // final Set<String> notifiedOrderIds = {};
 
     _orderSub = FirebaseFirestore.instance
         .collection('orders')
@@ -172,7 +150,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
           if (activeSnapshot.docs.isNotEmpty) {
             final doc = activeSnapshot.docs.first;
-            final data = doc.data() as Map<String, dynamic>;
+            final data = doc.data();
             final status = data['status'] as String;
             final orderId = doc.id;
             final paymentStatus = data['payment_status'];
@@ -195,14 +173,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             }
             if (_previousStatusPerOrder[orderId] != '$status|$paymentStatus') {
               _previousStatusPerOrder[orderId] = '$status|$paymentStatus';
-              // if (status == 'active') {
-              //   Navigator.of(context).push(
-              //     MaterialPageRoute(
-              //       builder: (_) =>
-              //           OrderRoomScreen(orderId: orderId, role: 'driver'),
-              //     ),
-              //   );
-              // }
               if (paymentStatus == 'success') {
                 NotificationService().showLocal(
                   id: orderId.hashCode & 0x7fffffff,
@@ -250,31 +220,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _updateDriverLocation(driverUid);
       }
     });
-  }
-
-  Future<void> _onDepartPressed() async {
-    if (_activeOrderId == null || _activeOrderData == null) return;
-    const GeoPoint defaultLocation = GeoPoint(-6.1900, 106.7969);
-    final GeoPoint pickupLocation =
-        _activeOrderData!['location'] as GeoPoint? ?? defaultLocation;
-    try {
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => DriverMapTrackingScreen(
-            orderId: _activeOrderId!,
-            userLocation: pickupLocation,
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      showAppSnackBar(
-        context,
-        'Gagal memulai perjalanan: $e',
-        type: AlertType.error,
-      );
-    }
   }
 
   Future<void> _updateDriverLocation(String driverUid) async {
@@ -375,249 +320,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                 ],
               ),
-            ),
-          );
-        },
-      );
-    } finally {
-      // 🔄 RESET setelah dialog ditutup
-      if (mounted) {
-        setState(() {
-          _showingDialog = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _promptAcceptOrder(
-    String orderId,
-    Map<String, dynamic> data,
-  ) async {
-    if (_showingDialog) return; // 🔒 GUARD
-    _showingDialog = true;
-    try {
-      if (!context.mounted) return;
-      final auth = Provider.of<AuthService>(context, listen: false);
-      final driverId = auth.currentUser?.uid ?? '';
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        enableDrag: false,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-        ),
-        builder: (ctx) {
-          return Padding(
-            padding: MediaQuery.of(ctx).viewInsets,
-            child: StatefulBuilder(
-              builder: (ctx2, setStateDialog) {
-                bool processing = false;
-                return SafeArea(
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 48,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            // animated icon
-                            TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 450),
-                              builder: (context, val, child) {
-                                return Transform.scale(
-                                  scale: 0.8 + 0.2 * val,
-                                  child: child,
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withAlpha(
-                                    (0.12 * 255).round(),
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.local_shipping,
-                                  color: Colors.green[700],
-                                  size: 32,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Pesanan Baru',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${data['address'] ?? '-'}',
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Jarak: ${data['distance'] ?? '-'} km',
-                                  style: const TextStyle(color: Colors.black54),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Harga: ${data['price'] ?? '-'}',
-                                  style: const TextStyle(
-                                    color: Colors.black87,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (data['eta'] != null)
-                              Chip(label: Text('${data['eta']}')),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  Navigator.of(ctx2).pop();
-                                  if (mounted) {
-                                    setState(() => _showingDialog = false);
-                                  }
-                                },
-                                child: const Text('Tolak'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green[700],
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                onPressed: () async {
-                                  if (processing) return;
-                                  setStateDialog(() => processing = true);
-                                  try {
-                                    final accepted = await _orderService
-                                        .acceptOrder(orderId, driverId);
-                                    if (!mounted) return;
-                                    if (accepted) {
-                                      _orderSub?.cancel();
-                                      setState(() => _showingDialog = false);
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            if (!mounted) return;
-                                            setState(() {
-                                              _activeOrderId = orderId;
-                                              _activeOrderData = data;
-                                              _activeOrderData!['status'] =
-                                                  'accepted';
-                                            });
-                                          });
-                                      await _updateDriverLocation(driverId);
-                                      if (!mounted) return;
-                                      showAppSnackBar(
-                                        context,
-                                        'Pesanan berhasil diterima',
-                                        type: AlertType.success,
-                                      );
-                                    } else {
-                                      if (!accepted) {
-                                        setState(() => _showingDialog = false);
-                                        showAppSnackBar(
-                                          context,
-                                          'Gagal menerima: pesanan sudah diambil driver lain',
-                                          type: AlertType.error,
-                                        );
-                                      }
-                                    }
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    setState(() => _showingDialog = false);
-                                    showAppSnackBar(
-                                      context,
-                                      'Gagal terima pesanan: $e',
-                                      type: AlertType.error,
-                                    );
-                                  } finally {
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          if (ctx2.mounted) {
-                                            Navigator.of(ctx2).pop();
-                                          }
-                                        });
-                                    try {
-                                      setStateDialog(() => processing = false);
-                                    } catch (_) {}
-                                  }
-                                },
-                                child: Builder(
-                                  builder: (_) {
-                                    if (processing) {
-                                      return const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      );
-                                    }
-                                    return const Text(
-                                      'Terima',
-                                      style: TextStyle(color: Colors.white),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
             ),
           );
         },

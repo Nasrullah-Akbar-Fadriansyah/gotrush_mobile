@@ -11,6 +11,8 @@ class ChatMessage {
   final Timestamp? readAt;
 
   final String type;
+  final double? latitude;
+  final double? longitude;
 
   ChatMessage({
     required this.id,
@@ -21,6 +23,8 @@ class ChatMessage {
     required this.createdAt,
     this.readAt,
     this.type = 'text',
+    this.latitude,
+    this.longitude,
   });
 
   factory ChatMessage.fromMap(Map<String, dynamic> map) {
@@ -33,6 +37,8 @@ class ChatMessage {
       createdAt: map['createdAt'],
       readAt: map['readAt'],
       type: map['type'] ?? 'text',
+      latitude: map['latitude']?.toDouble(),
+      longitude: map['longitude']?.toDouble(),
     );
   }
 
@@ -45,5 +51,7 @@ class ChatMessage {
     'createdAt': createdAt,
     'readAt': readAt,
     'type': type,
+    'latitude': latitude,
+    'longitude': longitude,
   };
 }

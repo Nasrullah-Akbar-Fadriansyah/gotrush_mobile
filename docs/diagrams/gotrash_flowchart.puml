@@ -1,0 +1,48 @@
+@startuml Flowchart
+' Flowchart: proses order end-to-end
+
+skinparam FlowchartFontSize 20
+title Flowchart Proses Order Penjemputan (GoTrash)
+
+start
+:User login atau register;
+:User pilih lokasi pada peta;
+:User isi detail dan jadwal;
+:Create order (Firestore)\nstatus=pending + order_history;
+
+if (Driver menerima order?) then (ya)
+  :Accept order\nstatus=active;
+  :Driver menuju lokasi dan tracking;
+  :Driver input berat;
+  :Propose weight\nstatus=awaiting_confirmation;
+
+  if (User setuju berat?) then (setuju)
+    :Set final_weight + price\nstatus=waiting_payment;
+    :User bayar via Midtrans WebView;
+
+    if (Pembayaran sukses?) then (ya)
+      :payment_status=success;
+      :status=pickup_validation;
+      :Driver tiba di lokasi\nstatus=arrived;
+      :Driver konfirmasi ambil\nstatus=waiting_user_validation;
+
+      if (User validasi pengambilan?) then (ya)
+        :status=picked_up;
+        :Driver complete order\nstatus=completed + archived;
+      else (tidak)
+        :status=arrived;
+        :Menunggu validasi ulang;
+      endif
+    else (batal/gagal)
+      :Tetap status=waiting_payment;
+    endif
+  else (sanggah)
+    :Dispute weight\nstatus=active;
+    :Driver koreksi berat dan ajukan ulang;
+  endif
+else (tidak)
+  :Order tetap pending;
+endif
+
+stop
+@enduml

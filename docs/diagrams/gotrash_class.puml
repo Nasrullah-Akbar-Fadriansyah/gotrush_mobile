@@ -1,0 +1,135 @@
+@startuml class
+
+'--- Konfigurasi Visual & Ukuran Font ---
+skinparam classAttributeIconSize 4
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 120
+skinparam ranksep 120
+
+' Pengaturan Ukuran Font
+skinparam classFontSize 20
+skinparam classAttributeFontSize 22
+skinparam titleFontSize 28
+skinparam ArrowFontSize 18
+skinparam ArrowMessageAlignment center
+skinparam packageStyle rectangle
+top to bottom direction
+
+title Class Diagram Firestore GoTrash Mobile
+
+package "Firestore Collections" as FC {
+  class Users {
+    +uid : String
+    +name : String
+    +email : String
+    +phone : String
+    +role : String
+    +fcm_token : String?
+    +status : String?
+    +createdAt : Timestamp
+    +last_login_at : Timestamp
+    +disabled : bool?
+    +disabled_at : Timestamp?
+  }
+
+  class Orders {
+    +order_id : String
+    +user_id : String
+    +driver_id : String?
+    +status : String
+    +payment_status : String
+    +weight : double
+    +driver_weight : double?
+    +final_weight : double?
+    +weight_status : String?
+    +distance : double
+    +price : double
+    +price_paid : double
+    +address : String
+    +location : GeoPoint
+    +photo_urls : List<String>
+    +pickup_date : Timestamp
+    +name : String
+    +phone_number : String
+    +created_at : Timestamp
+    +updated_at : Timestamp
+    +accepted_at : Timestamp?
+    +arrived_at : Timestamp?
+    +pickup_requested_at : Timestamp?
+    +picked_up_at : Timestamp?
+    +completed_at : Timestamp?
+    +archived_at : Timestamp?
+    +payment_time : Timestamp?
+    +archived : bool
+    +hidden_by_user : bool
+    +hidden_by_driver : bool
+    +last_message : Map?
+  }
+
+  class OrderHistory {
+    +order_id : String
+    +user_id : String
+    +driver_id : String?
+    +status : String
+    +price_paid : double
+    +address : String
+    +created_at : Timestamp
+    +completed_at : Timestamp?
+    +archived_at : Timestamp?
+  }
+
+  class Drivers {
+    +location : GeoPoint
+    +heading : double?
+    +speed : double?
+    +updatedAt : Timestamp
+  }
+
+  class DriversLocation {
+    +location : GeoPoint?
+    +lat : double?
+    +lng : double?
+    +last_update : Timestamp?
+    +timestamp : Timestamp?
+    +order_id : String?
+  }
+
+  class UsersLocation {
+    +lat : double?
+    +lng : double?
+    +latitude : double?
+    +longitude : double?
+  }
+}
+
+package "orders/{orderId} (Subcollections)" as OSub {
+  class Messages {
+    +id : String
+    +orderId : String
+    +senderId : String
+    +senderRole : String
+    +message : String
+    +createdAt : Timestamp
+    +readAt : Timestamp?
+    +type : String
+  }
+
+  class ChatMeta {
+    +unread_user : int
+    +unread_driver : int
+  }
+}
+
+FC -[hidden]down- OSub
+
+Users "1" --> "N" Orders : user_id
+Users "1" --> "N" UsersLocation : tracking
+Users "1" --> "N" Drivers : role=driver
+Users "1" --> "N" DriversLocation : role=driver
+Drivers "1" --> "N" Orders : driver_id
+Orders "1" --> "1" OrderHistory : archived copy
+Orders "1" --> "N" Messages : messages
+Orders "1" --> "1" ChatMeta : chat_meta/meta
+
+@enduml

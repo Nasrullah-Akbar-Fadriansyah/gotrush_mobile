@@ -8,18 +8,21 @@ class NotificationService {
   static final NotificationService _instance = NotificationService._private();
   factory NotificationService() => _instance;
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
   Future<void> init({required AuthService authService}) async {
-    final settings = await _fcm.requestPermission(
+    // IMPORTANT: Delay FirebaseMessaging access until after
+    // Firebase.initializeApp() has completed in main().
+    final fcm = FirebaseMessaging.instance;
+
+    final settings = await fcm.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      final token = await _fcm.getToken();
+      final token = await fcm.getToken();
       if (token != null) {
         await authService.updateFcmToken(token);
       }

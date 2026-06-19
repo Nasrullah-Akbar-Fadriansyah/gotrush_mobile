@@ -1,99 +1,57 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../screens/login_screen.dart';
-import '../screens/register_screen.dart';
+import 'package:sampah_online/screens/login_screen.dart';
+import 'package:sampah_online/screens/register_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  final bool isReady;
+  final String? initError;
+
+  const WelcomeScreen({super.key, this.isReady = false, this.initError});
 
   @override
   Widget build(BuildContext context) {
+    // Determine button state based on readiness and errors
+    final bool buttonsEnabled = isReady && initError == null;
+    final VoidCallback? onLoginPressed = buttonsEnabled
+        ? () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          )
+        : null;
+    final VoidCallback? onRegisterPressed = buttonsEnabled
+        ? () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const RegisterScreen()),
+          )
+        : null;
+
     return Scaffold(
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color.fromARGB(255, 93, 181, 96),
-              Color.fromARGB(255, 234, 234, 234),
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            colors: [Colors.green, Colors.teal],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        child: SafeArea(
+        child: Center(
           child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 10),
-
-                  Image.asset(
-                    'assets/images/welcome.png',
-                    height: 300,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-                    'Selamat Datang di GoTrash',
-                    style: GoogleFonts.poppins(
-                      fontSize: 31,
-                      fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(222, 0, 0, 0),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-                    'Jadwalkan penjemputan sampahmu secara mudah, cepat, dan ramah lingkungan 🌱',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      color: const Color.fromARGB(255, 0, 0, 0),
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  _buildButton(
-                    context,
-                    label: 'Mulai Sekarang',
-                    color: Colors.green.shade600,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const RegisterScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  _buildOutlinedButton(
-                    context,
-                    label: 'Sudah Punya Akun? Login',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 40),
-                ],
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                _buildLogo(context),
+                const SizedBox(height: 40),
+                _buildButton(context, 'Login', onLoginPressed),
+                const SizedBox(height: 20),
+                _buildButton(
+                  context,
+                  'Register',
+                  onRegisterPressed,
+                  isPrimary: false,
+                ),
+                const SizedBox(height: 30),
+                _buildStatusIndicator(),
+              ],
             ),
           ),
         ),
@@ -101,61 +59,100 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildLogo(BuildContext context) {
+    final double logoSize = MediaQuery.of(context).size.width * 1;
+    return Column(
+      children: [
+        Image.asset(
+          'assets/images/welcome.png',
+          height: logoSize,
+          width: logoSize,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(height: 1),
+        const Text(
+          'GoTrash',
+          style: TextStyle(
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const Text(
+          'Solusi Cerdas untuk Sampah Anda',
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.white70,
+            fontFamily: 'Poppins',
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildButton(
-    BuildContext context, {
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
+    BuildContext context,
+    String text,
+    VoidCallback? onPressed, {
+    bool isPrimary = true,
   }) {
     return SizedBox(
-      width: double.infinity,
+      width: MediaQuery.of(context).size.width * 0.8,
+      height: 50,
       child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 4,
-        ),
         onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isPrimary ? Colors.white : Colors.transparent,
+          foregroundColor: isPrimary ? Colors.green : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+            side: const BorderSide(color: Colors.white),
+          ),
+        ),
         child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          text,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Poppins',
           ),
         ),
       ),
     );
   }
 
-  Widget _buildOutlinedButton(
-    BuildContext context, {
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          side: BorderSide(color: Colors.green.shade600, width: 2),
-        ),
-        onPressed: onPressed,
+  Widget _buildStatusIndicator() {
+    if (initError != null) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            color: Colors.green.shade700,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          'Gagal inisialisasi: $initError',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.yellowAccent),
         ),
-      ),
-    );
+      );
+    }
+    if (!isReady) {
+      return const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              strokeWidth: 2.0,
+            ),
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Mempersiapkan aplikasi...',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink(); // Return empty space when ready
   }
 }

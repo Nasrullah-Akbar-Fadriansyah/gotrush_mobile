@@ -14,7 +14,6 @@ class _EdukasiScreenState extends State<EdukasiScreen>
   late Animation<double> _pulseScale;
   int _sectionIndex =
       0; // 0: Pengantar, 1: Jenis, 2: Kelebihan/Kekurangan, 3: 3R & Tips
-  List<bool> _expanded = [false, false, false, false];
   int _tipsIndex = 0;
   bool _introExpanded = false;
 
@@ -126,7 +125,6 @@ class _EdukasiScreenState extends State<EdukasiScreen>
   @override
   void initState() {
     super.initState();
-    _expanded = List<bool>.filled(5, false);
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
