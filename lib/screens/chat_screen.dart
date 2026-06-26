@@ -274,11 +274,11 @@ class _ChatScreenState extends State<ChatScreen> {
           width: 290,
           margin: const EdgeInsets.symmetric(vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: const Color.fromARGB(255, 75, 75, 75),
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -287,6 +287,59 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ClipRRect(
+              //   borderRadius: const BorderRadius.vertical(
+              //     top: Radius.circular(18),
+              //   ),
+              //   child: Stack(
+              //     alignment: Alignment.center,
+              //     children: [
+              //       Image.network(
+              //         _buildMapPreviewUrl(lat, lng),
+              //         height: 150,
+              //         width: double.infinity,
+              //         fit: BoxFit.cover,
+              //         loadingBuilder: (context, child, progress) {
+              //           if (progress == null) return child;
+
+              //           return Container(
+              //             height: 150,
+              //             color: Colors.grey[300],
+              //             child: const Center(
+              //               child: CircularProgressIndicator(),
+              //             ),
+              //           );
+              //         },
+              //         errorBuilder: (context, error, stackTrace) {
+              //           return Container(
+              //             height: 150,
+              //             color: Colors.grey[300],
+              //             child: const Center(
+              //               child: Icon(
+              //                 Icons.map,
+              //                 size: 50,
+              //                 color: Colors.grey,
+              //               ),
+              //             ),
+              //           );
+              //         },
+              //       ),
+              //       Container(
+              //         width: 44,
+              //         height: 44,
+              //         decoration: BoxDecoration(
+              //           color: Colors.white.withOpacity(0.9),
+              //           shape: BoxShape.circle,
+              //         ),
+              //         child: const Icon(
+              //           Icons.location_on,
+              //           color: Colors.red,
+              //           size: 28,
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ),
               Container(
                 height: 150,
                 width: double.infinity,
@@ -304,7 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Icon(Icons.location_on, color: Colors.white, size: 50),
                     SizedBox(height: 8),
                     Text(
-                      "Pickup Point",
+                      "Pickup Trash",
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -314,7 +367,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ],
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.all(14),
                 child: FutureBuilder<String>(
@@ -325,17 +377,18 @@ class _ChatScreenState extends State<ChatScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Icon(
                               Icons.location_on,
-                              color: Colors.green[700],
+                              color: Colors.white,
                               size: 18,
                             ),
-                            const SizedBox(width: 6),
-                            const Text(
+                            SizedBox(width: 6),
+                            Text(
                               "Lokasi Penjemputan",
                               style: TextStyle(
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
                               ),
@@ -346,8 +399,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
                         Text(
                           address,
-                          style: TextStyle(
-                            color: Colors.grey[700],
+                          style: const TextStyle(
+                            color: Color.fromARGB(255, 255, 255, 255),
                             fontSize: 13,
                           ),
                         ),
@@ -373,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                               SizedBox(width: 6),
                               Text(
-                                "Buka Navigasi",
+                                "Buka Maps",
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
