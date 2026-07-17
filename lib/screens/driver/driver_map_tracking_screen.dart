@@ -117,8 +117,8 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
         driverLocation,
         userDestination,
         roadType: osm.RoadType.car,
-        roadOption: osm.RoadOption(
-          roadColor: const Color.fromARGB(255, 43, 255, 0),
+        roadOption: const osm.RoadOption(
+          roadColor: Color.fromARGB(255, 43, 255, 0),
           roadWidth: 10,
           zoomInto: true,
         ),
@@ -221,6 +221,7 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
                           );
                         }
                       } catch (_) {}
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Ditandai: Tiba di lokasi'),

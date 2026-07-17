@@ -257,12 +257,13 @@ class _OrderHistoryWidgetState extends State<OrderHistoryWidget> {
                       : (meta['unread_driver'] ?? 0);
                 }
                 if (mounted && unread > 0) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Pesan belum dibaca: $unread')),
                   );
                 }
               } catch (_) {}
-              if (!mounted) return;
+              if (!context.mounted) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(

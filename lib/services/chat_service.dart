@@ -52,6 +52,57 @@ class ChatService {
     });
   }
 
+  Future<void> sendLocation({
+    required String orderId,
+    required String senderId,
+    required String senderRole,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final orderRef = _firestore.collection('orders').doc(orderId);
+    final messageRef = orderRef.collection('messages').doc();
+
+    final now = Timestamp.now();
+
+    final chatMessage = ChatMessage(
+      id: messageRef.id,
+      orderId: orderId,
+      senderId: senderId,
+      senderRole: senderRole,
+      message: 'Lokasi Saya',
+      createdAt: now,
+      readAt: null,
+      type: 'location',
+      latitude: latitude,
+      longitude: longitude,
+    );
+
+    await _firestore.runTransaction((tx) async {
+      tx.set(messageRef, chatMessage.toMap());
+
+      tx.set(orderRef, {
+        'last_message': {
+          'text': '📍 Lokasi Dibagikan',
+          'sender_role': senderRole,
+          'created_at': now,
+          'type': 'location',
+        },
+      }, SetOptions(merge: true));
+
+      final metaRef = orderRef.collection('chat_meta').doc('meta');
+
+      if (senderRole == 'user') {
+        tx.set(metaRef, {
+          'unread_driver': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+      } else {
+        tx.set(metaRef, {
+          'unread_user': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+      }
+    });
+  }
+
   Stream<QuerySnapshot> getMessages(String orderId) {
     return _firestore
         .collection('orders')

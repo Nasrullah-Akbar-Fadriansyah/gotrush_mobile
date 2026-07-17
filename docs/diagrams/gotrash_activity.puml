@@ -1,0 +1,81 @@
+@startuml Activity
+' Activity diagram (portrait) dengan swimlane ringkas
+
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 50
+skinparam ranksep 40
+skinparam activityFontSize 20
+
+title Activity Diagram Penjemputan Sampah (GoTrash)
+
+|User|
+start
+:Login/daftar;
+:Pilih lokasi (map)\n+ isi detail & jadwal;
+
+|System (Firestore)|
+:Create order\nstatus=pending;
+:Create order_history\n(initial);
+
+|Driver|
+:Melihat order\nbaru (stream);
+if (Terima order?) then (ya)
+  :Accept order\nstatus=active;
+  :Menuju lokasi;
+  :Input berat hasil timbang;
+
+  |System (Firestore)|
+  :Propose weight\nstatus=awaiting_confirmation;
+
+  |User|
+  if (Setuju berat?) then (ya)
+    |System (Firestore)|
+    :Set final_weight + price;
+    :status=waiting_payment;
+
+    |User|
+    :Bayar via Midtrans WebView;
+
+    |System (Firestore)|
+    :payment_status=success;
+    :status=pickup_validation;
+
+    |Driver|
+    :Tiba di lokasi;
+
+    |System (Firestore)|
+    :driverArrived\nstatus=arrived;
+
+    |Driver|
+    :Konfirmasi ambil\n(setelah pembayaran);
+
+    |System (Firestore)|
+    :status=waiting_user_validation;
+
+    |User|
+    :Validasi pengambilan;
+
+    |System (Firestore)|
+    if (Valid?) then (ya)
+      :status=picked_up;
+      |Driver|
+      :Selesaikan order;
+      |System (Firestore)|
+      :status=completed\n+ archived;
+    else (tidak)
+      :status=arrived;
+    endif
+  else (sanggah)
+    |System (Firestore)|
+    :Dispute weight\nstatus=active;
+
+    |Driver|
+    :Koreksi berat\ndan ajukan ulang;
+  endif
+else (tidak)
+  :Lewati order;
+endif
+
+stop
+@enduml

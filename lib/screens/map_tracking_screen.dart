@@ -232,16 +232,16 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
       body: osm.OSMFlutter(
         controller: _mapController,
         osmOption: osm.OSMOption(
-          zoomOption: osm.ZoomOption(
+          zoomOption: const osm.ZoomOption(
             initZoom: 14,
             minZoomLevel: 3,
             maxZoomLevel: 18,
           ),
           userLocationMarker: osm.UserLocationMaker(
-            personMarker: osm.MarkerIcon(
+            personMarker: const osm.MarkerIcon(
               icon: Icon(Icons.person_pin, color: Colors.blue),
             ),
-            directionArrowMarker: osm.MarkerIcon(
+            directionArrowMarker: const osm.MarkerIcon(
               icon: Icon(Icons.navigation, color: Colors.black),
             ),
           ),

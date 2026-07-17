@@ -210,8 +210,8 @@ class OrderService {
         throw Exception('User tidak berhak pada order ini');
       }
       final driverWeight = (data['driver_weight'] ?? 0).toDouble();
-      const double pricePerKm = 2000;
-      const double pricePerKg = 2000;
+      const double pricePerKm = 1000;
+      const double pricePerKg = 1000;
       final distance = (data['distance'] ?? 0).toDouble();
       final newPrice = (distance * pricePerKm) + (driverWeight * pricePerKg);
       tx.update(ref, {

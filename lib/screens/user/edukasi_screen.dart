@@ -14,7 +14,6 @@ class _EdukasiScreenState extends State<EdukasiScreen>
   late Animation<double> _pulseScale;
   int _sectionIndex =
       0; // 0: Pengantar, 1: Jenis, 2: Kelebihan/Kekurangan, 3: 3R & Tips
-  List<bool> _expanded = [false, false, false, false];
   int _tipsIndex = 0;
   bool _introExpanded = false;
 
@@ -126,7 +125,6 @@ class _EdukasiScreenState extends State<EdukasiScreen>
   @override
   void initState() {
     super.initState();
-    _expanded = List<bool>.filled(5, false);
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -158,7 +156,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
             fontFamily: 'poppins',
           ),
         ),
-        backgroundColor: Color.fromARGB(255, 4, 147, 9),
+        backgroundColor: const Color.fromARGB(255, 4, 147, 9),
         elevation: 0,
       ),
       body: FadeTransition(
@@ -212,10 +210,10 @@ class _EdukasiScreenState extends State<EdukasiScreen>
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   'Belajar Kelola Sampah',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
@@ -234,7 +232,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
   }
 
   Widget _buildSectionTabs() {
-    final labels = const [
+    const labels = [
       'Pengantar',
       'Jenis Sampah',
       'Kelebihan & Kekurangan',
@@ -466,8 +464,8 @@ class _EdukasiScreenState extends State<EdukasiScreen>
                 style: const TextStyle(color: Colors.black87),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(Icons.checklist, color: Colors.teal),
                   SizedBox(width: 8),
                   Text(
@@ -566,8 +564,8 @@ class _EdukasiScreenState extends State<EdukasiScreen>
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.checklist, color: Colors.teal),
               SizedBox(width: 8),
               Text(
@@ -684,8 +682,8 @@ class _EdukasiScreenState extends State<EdukasiScreen>
             );
           }),
           const SizedBox(height: 16),
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.lightbulb, color: Colors.orange),
               SizedBox(width: 8),
               Text(
@@ -716,8 +714,8 @@ class _EdukasiScreenState extends State<EdukasiScreen>
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.calendar_today, color: Colors.teal),
               SizedBox(width: 8),
               Text(
@@ -795,8 +793,8 @@ class _EdukasiScreenState extends State<EdukasiScreen>
                 const SizedBox(height: 8),
                 Text(text),
                 const SizedBox(height: 16),
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.lightbulb, color: Colors.orange),
                     SizedBox(width: 8),
                     Text(
@@ -812,8 +810,12 @@ class _EdukasiScreenState extends State<EdukasiScreen>
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 18),
-                        SizedBox(width: 8),
+                        const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(child: Text(e)),
                       ],
                     ),

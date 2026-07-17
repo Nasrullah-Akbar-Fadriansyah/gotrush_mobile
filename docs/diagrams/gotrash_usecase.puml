@@ -1,0 +1,82 @@
+@startuml usecase
+left to right direction
+
+title Use Case Diagram GoTrash Mobile
+
+actor User
+actor Driver
+actor Admin
+actor "Midtrans" as Midtrans
+actor "Firebase (Auth/Firestore)" as Firebase
+actor "FCM/Local Notification" as Notif
+
+rectangle "GoTrash Mobile" {
+  usecase "Register" as UC_Register
+  usecase "Login" as UC_Login
+  usecase "Kelola Profil" as UC_Profile
+
+  usecase "Buat Order Penjemputan" as UC_CreateOrder
+  usecase "Pilih Lokasi Penjemputan" as UC_SelectLocation
+  usecase "Lihat Jadwal Penjemputan" as UC_Schedule
+  usecase "Lihat Riwayat Order" as UC_History
+  usecase "Edukasi Daur Ulang" as UC_Edukasi
+  usecase "Chat User/Driver" as UC_Chat
+  usecase "Konfirmasi Berat" as UC_ConfirmWeight
+  usecase "Sanggah Berat" as UC_DisputeWeight
+  usecase "Bayar Order" as UC_Payment
+  usecase "Lacak Driver" as UC_TrackDriver
+  usecase "Validasi Pengambilan" as UC_ValidatePickup
+
+  usecase "Lihat Order Baru" as UC_ViewOrders
+  usecase "Terima Order" as UC_AcceptOrder
+  usecase "Update Lokasi Driver" as UC_UpdateLocation
+  usecase "Tiba di Lokasi" as UC_Arrived
+  usecase "Konfirmasi Ambil" as UC_PickupConfirm
+  usecase "Selesaikan Order" as UC_CompleteOrder
+
+  usecase "Kelola User" as UC_ManageUsers
+  usecase "Kelola Driver" as UC_ManageDrivers
+  usecase "Lihat Pemasukan" as UC_Revenue
+
+  usecase "Terima Notifikasi Status" as UC_Notify
+}
+
+User -- UC_Register
+User -- UC_Login
+User -- UC_Profile
+User -- UC_CreateOrder
+User -- UC_Schedule
+User -- UC_History
+User -- UC_Edukasi
+User -- UC_Chat
+User -- UC_ConfirmWeight
+User -- UC_DisputeWeight
+User -- UC_Payment
+User -- UC_TrackDriver
+User -- UC_ValidatePickup
+User -- UC_Notify
+
+Driver -- UC_ViewOrders
+Driver -- UC_AcceptOrder
+Driver -- UC_UpdateLocation
+Driver -- UC_Arrived
+Driver -- UC_PickupConfirm
+Driver -- UC_CompleteOrder
+Driver -- UC_Chat
+Driver -- UC_History
+Driver -- UC_Profile
+Driver -- UC_Notify
+
+Admin -- UC_ManageUsers
+Admin -- UC_ManageDrivers
+Admin -- UC_Revenue
+
+UC_CreateOrder ..> UC_SelectLocation : <<include>>
+UC_Payment ...> Midtrans : <<include>>
+UC_Register .....> Firebase : <<include>>
+UC_Login .....> Firebase : <<include>>
+UC_CreateOrder .....> Firebase : <<include>>
+UC_AcceptOrder ...> Firebase : <<include>>
+UC_Chat ...> Firebase : <<include>>
+UC_Notify ..> Notif : <<include>>
+@enduml

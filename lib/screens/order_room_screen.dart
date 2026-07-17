@@ -33,12 +33,9 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green[800],
-        title: Text(
+        title: const Text(
           'Order Aktif',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -81,7 +78,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SectionHeader(title: 'Status'),
+                const _SectionHeader(title: 'Status'),
                 _InfoRow(label: 'Status', value: status.toUpperCase()),
                 const SizedBox(height: 12),
 
@@ -105,7 +102,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                 ],
                 const SizedBox(height: 12),
 
-                _SectionHeader(title: 'Detail Order'),
+                const _SectionHeader(title: 'Detail Order'),
                 _InfoRow(label: 'Alamat', value: address),
                 _InfoRow(
                   label: 'Berat',
@@ -122,7 +119,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                 _InfoRow(label: 'Jadwal', value: pickupDateStr),
                 const SizedBox(height: 20),
 
-                _SectionHeader(title: 'Komunikasi'),
+                const _SectionHeader(title: 'Komunikasi'),
                 Row(
                   children: [
                     Expanded(
@@ -186,7 +183,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                 ),
 
                 const SizedBox(height: 20),
-                _SectionHeader(title: 'Penimbangan'),
+                const _SectionHeader(title: 'Penimbangan'),
                 _buildWeighingSection(
                   context: context,
                   status: status,
@@ -356,6 +353,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                                 orderId: orderId,
                                 userId: user.uid,
                               );
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
@@ -364,6 +362,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                                 ),
                               );
                             } catch (e) {
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Gagal: $e')),
                               );
@@ -388,6 +387,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                                 orderId: orderId,
                                 userId: user.uid,
                               );
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
@@ -396,6 +396,7 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                                 ),
                               );
                             } catch (e) {
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Gagal: $e')),
                               );
@@ -434,11 +435,13 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                 email: user.email ?? 'user@example.com',
               );
               if (snapUrl == null) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Gagal memulai pembayaran')),
                 );
                 return;
               }
+              if (!context.mounted) return;
               await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => MidtransPaymentWebView(
@@ -590,12 +593,14 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
                       driverId: driverId,
                       weight: val,
                     );
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Berat diajukan ke pengguna'),
                       ),
                     );
                   } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Gagal mengajukan berat: $e')),
                     );

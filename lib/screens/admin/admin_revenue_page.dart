@@ -90,6 +90,7 @@ class _AdminRevenuePageState extends State<AdminRevenuePage> {
                           .where('status', isEqualTo: 'completed')
                           .get();
                       final count = countSnap.size;
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Total order completed: $count'),

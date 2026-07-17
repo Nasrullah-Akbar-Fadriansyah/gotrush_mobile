@@ -8,7 +8,6 @@ import '../../models/order_model.dart';
 import '../../payment.dart';
 import '../../midtrans_payment_webview.dart';
 import '../../services/notification_service.dart';
-import '../../services/order_service.dart';
 
 class PickupScheduleScreen extends StatelessWidget {
   const PickupScheduleScreen({super.key});
@@ -60,7 +59,7 @@ class PickupScheduleScreen extends StatelessWidget {
                 (order) =>
                     order.pickupDate != null &&
                     order.pickupDate!.isAfter(
-                      DateTime.now().subtract(Duration(days: 1)),
+                      DateTime.now().subtract(const Duration(days: 1)),
                     ),
               )
               .toList();
@@ -181,7 +180,7 @@ class PickupScheduleScreen extends StatelessWidget {
                               final snapUrl = await getMidtransSnapUrl(
                                 orderId: order.id,
                                 grossAmount: price,
-                                name: order.name ?? 'User',
+                                name: order.name,
                                 email: email,
                               );
                               if (snapUrl == null) {
@@ -217,7 +216,7 @@ class PickupScheduleScreen extends StatelessWidget {
                                     .collection('orders')
                                     .doc(order.id)
                                     .get();
-                                final d = snap.data() as Map<String, dynamic>?;
+                                final d = snap.data();
                                 final driverId =
                                     d?['driver_id'] as String? ?? '';
                                 if (driverId.isNotEmpty) {

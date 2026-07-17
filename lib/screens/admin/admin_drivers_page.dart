@@ -77,6 +77,7 @@ class AdminDriversPage extends StatelessWidget {
                           );
                           if (confirm == true) {
                             await _softDeleteDriver(d.id);
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Driver dinonaktifkan'),
@@ -116,6 +117,7 @@ class AdminDriversPage extends StatelessWidget {
                                 .collection('users')
                                 .doc(d.id)
                                 .delete();
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Dokumen driver dihapus'),
