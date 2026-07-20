@@ -19,20 +19,25 @@ class DashboardService {
 
     double totalRevenue = 0;
     double totalWeight = 0;
-    int completedOrders = 0;
+    int totalOrdersCount =
+        0; // Mengubah fungsi penampung dari completedOrders ke total semua order
     int totalUsers = 0;
     int totalDrivers = 0;
 
     // ORDER HISTORY
     for (final doc in historySnapshot.docs) {
       final data = doc.data();
+      final status = data['status'] ?? '';
 
-      totalRevenue += ((data['price_paid'] ?? data['price'] ?? 0) as num)
-          .toDouble();
+      // Pendapatan bersih hanya dihitung jika status order selesai/completed
+      if (status == 'completed') {
+        totalRevenue += ((data['price_paid'] ?? data['price'] ?? 0) as num)
+            .toDouble();
+        totalWeight += ((data['weight'] ?? 0) as num).toDouble();
+      }
 
-      totalWeight += ((data['weight'] ?? 0) as num).toDouble();
-
-      completedOrders++;
+      // Setiap ada dokumen order (baik pending, aktif, selesai, batal) jumlah total bertambah
+      totalOrdersCount++;
     }
 
     // USERS
@@ -43,7 +48,6 @@ class DashboardService {
         case 'user':
           totalUsers++;
           break;
-
         case 'driver':
           totalDrivers++;
           break;
@@ -52,7 +56,8 @@ class DashboardService {
 
     return DashboardStats(
       totalRevenue: totalRevenue,
-      totalCompletedOrders: completedOrders,
+      totalCompletedOrders:
+          totalOrdersCount, // Menyuplai total keseluruhan ke model stats Anda
       totalWeight: totalWeight,
       totalUsers: totalUsers,
       totalDrivers: totalDrivers,
@@ -236,8 +241,8 @@ class DashboardService {
           name: user["name"] ?? "-",
           phone: user["phone"] ?? "-",
           totalOrders: item.value,
-          totalWeight: 0, // Placeholder, you can calculate this if needed
-          totalRevenue: 0, // Placeholder, you can calculate this if needed
+          totalWeight: 0,
+          totalRevenue: 0,
         ),
       );
     }

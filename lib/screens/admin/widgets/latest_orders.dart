@@ -12,83 +12,114 @@ class LatestOrders extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
-
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(16),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-
           children: [
             const Text(
               "Order Terbaru",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
-
-            const SizedBox(height: 16),
-
+            const SizedBox(height: 12),
             ListView.separated(
               shrinkWrap: true,
-
               physics: const NeverScrollableScrollPhysics(),
-
               itemCount: orders.length,
-
-              separatorBuilder: (_, __) => const Divider(),
-
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (_, index) {
                 final order = orders[index];
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.green.shade100,
-                      child: const Icon(
-                        Icons.shopping_bag,
-                        color: Colors.green,
+                return InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailPage(orderId: order.id),
                       ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade200),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-
-                    title: Text(
-                      order.userName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-
-                    subtitle: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(height: 4),
-
-                        Text("Driver : ${order.driverName}"),
-
-                        Text("Berat : ${order.weight} Kg"),
-
-                        Text(AdminFormatter.rupiah(order.price)),
-                      ],
-                    ),
-
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _statusChip(order.status),
-
-                        const SizedBox(height: 6),
-
-                        const Icon(Icons.arrow_forward_ios, size: 14),
-                      ],
-                    ),
-
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => OrderDetailPage(orderId: order.id),
+                        // Bagian Leading / Avatar kiri
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.green.shade100,
+                          child: const Icon(
+                            Icons.shopping_bag,
+                            color: Colors.green,
+                            size: 20,
+                          ),
                         ),
-                      );
-                    },
+                        const SizedBox(width: 12),
+
+                        // Bagian Konten Tengah
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                order.userName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "Driver : ${order.driverName}",
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                "Berat : ${order.weight} Kg",
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                AdminFormatter.rupiah(order.price),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Bagian Kanan / Trailing (Status & Panah)
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            _statusChip(order.status),
+                            const SizedBox(height: 16),
+                            const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 14,
+                              color: Colors.grey,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -102,7 +133,6 @@ class LatestOrders extends StatelessWidget {
 
 Widget _statusChip(String status) {
   Color color;
-
   String label;
 
   switch (status) {
@@ -110,33 +140,32 @@ Widget _statusChip(String status) {
       label = "Selesai";
       color = Colors.green;
       break;
-
     case "active":
       label = "Aktif";
       color = Colors.blue;
       break;
-
     case "pending":
       label = "Pending";
       color = Colors.orange;
       break;
-
     case "cancelled":
       label = "Batal";
       color = Colors.red;
       break;
-
     default:
       label = status;
       color = Colors.grey;
   }
 
-  return Chip(
-    label: Text(
-      label,
-      style: const TextStyle(color: Colors.white, fontSize: 11),
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(6),
     ),
-    backgroundColor: color,
-    visualDensity: VisualDensity.compact,
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+    ),
   );
 }
