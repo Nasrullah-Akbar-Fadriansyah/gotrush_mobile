@@ -3,6 +3,14 @@ import 'package:flutter/foundation.dart';
 
 class OrderService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  /// Fungsi: Membuat atau menambahkan pesanan (*order*) baru ke dalam database Cloud Firestore secara bersamaan (*atomic batch*).
+  /// Cara Kerja:
+  /// 1. Menerima data masukan (parameter) lengkap mengenai detail pesanan sampah dari pengguna (seperti berat, jarak, harga, alamat, koordinat GPS, foto, nama, dan nomor telepon).
+  /// 2. Menyusun data tersebut ke dalam struktur objek `Map` (JSON) bernama `data`, serta menambahkan informasi default seperti `payment_status: "pending"`, status arsip, dan stempel waktu server (`FieldValue.serverTimestamp()`).
+  /// 3. Menggunakan fitur `WriteBatch` (`_db.batch()`) milik Firestore. Fitur ini mengelompokkan beberapa perintah tulis menjadi satu baris transaksi aman (*All-or-Nothing*).
+  /// 4. Menyiapkan dua target dokumen baru dengan ID pesanan yang sama (`orderId`), yaitu pada tabel/koleksi `'orders'` dan koleksi rekam jejak `'order_history'`.
+  /// 5. Menuliskan data tersebut ke kedua koleksi secara serentak melalui perintah `batch.commit()`. Jika salah satu gagal (misal koneksi terputus di tengah jalan), maka kedua data tersebut dibatalkan secara otomatis agar database tetap konsisten dan tidak korup
   Future<void> createOrder({
     required String orderId,
     required String userId,
@@ -54,6 +62,15 @@ class OrderService {
     await batch.commit();
   }
 
+  /// Fungsi: Mengubah status pesanan ketika driver mengambil atau menerima orderan (`accept order`).
+  /// Fungsi ini mengembalikan nilai boolean (`true` jika berhasil diambil oleh driver, atau `false` jika gagal).
+  /// Cara Kerja:
+  /// 1. Menentukan referensi dokumen pesanan di koleksi `'orders'` dan `'order_history'` berdasarkan `orderId`.
+  /// 2. Menggunakan sistem **Transaction** (`_db.runTransaction`). Berbeda dengan batch, transaksi ini membaca data server terlebih dahulu untuk memastikan kondisi terkini sebelum menulis. Ini sangat krusial agar orderan tidak bisa "berebutan" atau diambil oleh dua driver sekaligus (*Race Condition*).
+  /// 3. Di dalam transaksi, aplikasi mengambil (*get*) data pesanan terbaru dari server.
+  /// 4. Melakukan validasi status: Jika pesanan tidak ada atau statusnya sudah berubah (bukan `'pending'` lagi, misalnya sudah diambil driver lain), transaksi langsung dibatalkan dan mengembalikan nilai `false`.
+  /// 5. Jika status lolos validasi (masih `'pending'`), transaksi akan memperbarui data dokumen dengan memasukkan `driver_id` penjemput, mengubah status menjadi `'active'`, serta mencatat waktu `accepted_at`.
+  /// 6. Menulis perubahan tersebut ke koleksi `'orders'` dan menggabungkannya (*merge*) ke `'order_history'`, lalu mengembalikan nilai `true`. Jika ada kendala jaringan, proses otomatis dialihkan ke blok `catch` dan mengembalikan nilai `false`.
   Future<bool> acceptOrder(String orderId, String driverId) async {
     final orderRef = _db.collection('orders').doc(orderId);
     final historyRef = _db.collection('order_history').doc(orderId);

@@ -2,22 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:sampah_online/screens/login_screen.dart';
 import 'package:sampah_online/screens/register_screen.dart';
 
+/// Fungsi: Widget halaman selamat datang (Welcome Screen) aplikasi GoTrash.
+/// Cara Kerja: Menampilkan logo, nama aplikasi, slogan, serta tombol navigasi menuju
+/// halaman Login atau Register. Halaman ini juga bertindak sebagai pelindung (gatekeeper)
+/// yang memvalidasi apakah status inisialisasi aplikasi (`isReady` & `initError`) sudah terpenuhi
+/// sebelum mengaktifkan tombol interaksi pengguna.
 class WelcomeScreen extends StatelessWidget {
+  /// Fungsi: Menandakan apakah sistem latar belakang (seperti Firebase) sudah siap digunakan.
   final bool isReady;
+
+  /// Fungsi: Menyimpan pesan error jika proses inisialisasi aplikasi gagal.
   final String? initError;
 
   const WelcomeScreen({super.key, this.isReady = false, this.initError});
 
   @override
   Widget build(BuildContext context) {
-    // Determine button state based on readiness and errors
+    /// Fungsi: Logika untuk menentukan status aktif tombol.
+    /// Cara Kerja: Tombol hanya akan aktif (`true`) jika aplikasi sudah siap (`isReady` bernilai true)
+    /// dan tidak ada error (`initError` bernilai null).
     final bool buttonsEnabled = isReady && initError == null;
+
+    /// Fungsi: Aksi ketika tombol Login ditekan.
+    /// Cara Kerja: Jika tombol aktif, fungsi akan melakukan push navigasi ke `LoginScreen`.
+    /// Jika tidak aktif, mengembalikan nilai `null` (membuat tombol berstatus disabled).
     final VoidCallback? onLoginPressed = buttonsEnabled
         ? () => Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const LoginScreen()),
           )
         : null;
+
+    /// Fungsi: Aksi ketika tombol Register ditekan.
+    /// Cara Kerja: Jika tombol aktif, fungsi akan melakukan push navigasi ke `RegisterScreen`.
+    /// Jika tidak aktif, mengembalikan nilai `null`.
     final VoidCallback? onRegisterPressed = buttonsEnabled
         ? () => Navigator.push(
             context,
