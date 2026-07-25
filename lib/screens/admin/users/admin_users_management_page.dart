@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminUsersManagementPage extends StatefulWidget {
   final String roleFilter; // 'user' atau 'driver'
@@ -14,7 +16,7 @@ class AdminUsersManagementPage extends StatefulWidget {
 class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Menampilkan Dialog Form untuk Tambah atau Edit Pengguna
+  // [CREATE & UPDATE PROCESS] Dialog Form Gabungan
   void _showFormDialog({
     String? docId,
     String? currentName,
@@ -24,112 +26,216 @@ class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
     final nameController = TextEditingController(text: currentName);
     final phoneController = TextEditingController(text: currentPhone);
     final emailController = TextEditingController(text: currentEmail);
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
     final isEdit = docId != null;
+    bool showPassword = false;
+    bool showConfirmPassword = false;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          title: Text(
-            isEdit
-                ? 'Edit Data ${widget.roleFilter}'
-                : 'Tambah Data ${widget.roleFilter}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Lengkap',
-                    prefixIcon: Icon(Icons.person),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              title: Text(
+                isEdit
+                    ? 'Edit Data ${widget.roleFilter}'
+                    : 'Tambah Data ${widget.roleFilter}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nama Lengkap',
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: phoneController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nomor Telepon',
+                        prefixIcon: Icon(Icons.phone),
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      enabled: !isEdit, // Email hanya diisi saat tambah baru
+                    ),
+
+                    // Field Password Hanya Tampak Saat Tambah User Baru
+                    if (!isEdit) ...[
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: !showPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              showPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                showPassword = !showPassword;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: confirmPasswordController,
+                        obscureText: !showConfirmPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Konfirmasi Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              showConfirmPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                showConfirmPassword = !showConfirmPassword;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Batal',
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nomor Telepon',
-                    prefixIcon: Icon(Icons.phone),
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final phone = phoneController.text.trim();
+                    final email = emailController.text.trim();
+                    final password = passwordController.text;
+                    final confirmPassword = confirmPasswordController.text;
+
+                    // Validasi Dasar
+                    if (name.isEmpty || phone.isEmpty || email.isEmpty) {
+                      _showSnackBar('Nama, Telepon, dan Email wajib diisi!');
+                      return;
+                    }
+
+                    if (!isEdit) {
+                      if (password.isEmpty || confirmPassword.isEmpty) {
+                        _showSnackBar('Password wajib diisi!');
+                        return;
+                      }
+
+                      if (password != confirmPassword) {
+                        _showSnackBar('Konfirmasi password tidak cocok!');
+                        return;
+                      }
+
+                      final passwordRegExp = RegExp(
+                        r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9]).{6,}$',
+                      );
+                      if (!passwordRegExp.hasMatch(password)) {
+                        _showSnackBar(
+                          'Password min. 6 karakter, kombinasi huruf besar, kecil, & angka.',
+                        );
+                        return;
+                      }
+                    }
+
+                    Navigator.pop(context);
+
+                    try {
+                      if (isEdit) {
+                        // UPDATE DATA FIRESTORE
+                        await _firestore.collection('users').doc(docId).update({
+                          'name': name,
+                          'phone': phone,
+                        });
+                        _showSnackBar('Data berhasil diperbarui');
+                      } else {
+                        // CREATE USER DENGAN FIREBASE AUTH (Tanpa Mengeluarkan Admin)
+                        FirebaseApp tempApp = await Firebase.initializeApp(
+                          name: 'tempRegisterApp',
+                          options: Firebase.app().options,
+                        );
+
+                        UserCredential cred =
+                            await FirebaseAuth.instanceFor(
+                              app: tempApp,
+                            ).createUserWithEmailAndPassword(
+                              email: email,
+                              password: password,
+                            );
+
+                        // Simpan Detail Pengguna ke Firestore dengan ID dari Auth
+                        await _firestore
+                            .collection('users')
+                            .doc(cred.user!.uid)
+                            .set({
+                              'name': name,
+                              'phone': phone,
+                              'email': email,
+                              'role':
+                                  widget.roleFilter, // Otomatis sesuai halaman
+                              'status': widget.roleFilter == 'driver'
+                                  ? 'offline'
+                                  : 'active',
+                              'created_at': FieldValue.serverTimestamp(),
+                            });
+
+                        // Hapus App Sementara
+                        await tempApp.delete();
+
+                        _showSnackBar('Data $name berhasil ditambahkan!');
+                      }
+                    } catch (e) {
+                      _showSnackBar('Terjadi kesalahan: $e');
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
                   ),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  enabled:
-                      !isEdit, // Email tidak boleh diedit jika memperbarui data
+                  child: Text(isEdit ? 'Simpan' : 'Tambah'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                final phone = phoneController.text.trim();
-                final email = emailController.text.trim();
-
-                if (name.isEmpty || phone.isEmpty || email.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Semua field harus diisi!')),
-                  );
-                  return;
-                }
-
-                Navigator.pop(context);
-
-                try {
-                  if (isEdit) {
-                    await _firestore.collection('users').doc(docId).update({
-                      'name': name,
-                      'phone': phone,
-                    });
-                    _showSnackBar('Data berhasil diperbarui');
-                  } else {
-                    await _firestore.collection('users').add({
-                      'name': name,
-                      'phone': phone,
-                      'email': email,
-                      'role': widget.roleFilter,
-                      'status': widget.roleFilter == 'driver'
-                          ? 'offline'
-                          : 'active',
-                      'created_at': FieldValue.serverTimestamp(),
-                    });
-                    _showSnackBar('Data berhasil ditambahkan');
-                  }
-                } catch (e) {
-                  _showSnackBar('Terjadi kesalahan: $e');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(isEdit ? 'Simpan' : 'Tambah'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
   }
 
-  // Menampilkan Dialog Konfirmasi Hapus Akun
+  // fungsi hapus data user/driver
   void _showDeleteConfirmation(String docId, String name) {
     showDialog(
       context: context,
@@ -176,9 +282,7 @@ class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final String labelTitle = widget.roleFilter == 'user'
-        ? 'Pelanggan / User'
-        : 'Driver / Pengemudi';
+    final String labelTitle = widget.roleFilter == 'user' ? 'User' : 'Driver';
 
     return Scaffold(
       appBar: AppBar(
@@ -277,7 +381,7 @@ class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
                         Text('📞 Telp: $phone'),
                         Text('✉️ Email: $email'),
                         if (widget.roleFilter == 'driver')
-                          Text('🟢 Status Drive: $status'),
+                          Text('🟢 Status Driver: $status'),
                       ],
                     ),
                   ),

@@ -37,7 +37,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     super.initState();
     _fetchOrders();
 
-    // Listener untuk sistem Paginasi / Infinite Scroll
+    // Deteksi kalau scroll user udah dekat bagian bawah (90%), panggil data baru (Paginasi)
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent * 0.9) {
@@ -63,7 +63,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     await _fetchOrders();
   }
 
-  // Mengambil data dari Firestore menggunakan batasan limit pagination
+  // [READ PROCESS - PAGINATION] Mengambil data order secara efisien
   Future<void> _fetchOrders() async {
     if (_isLoading || !_hasMore) return;
 
@@ -78,7 +78,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
       if (_selectedFilter != 'all') {
         query = query.where('status', isEqualTo: _selectedFilter);
       }
-
+      // Titik mulai pagination
       if (_lastDocument != null) {
         query = query.startAfterDocument(_lastDocument!);
       }
@@ -88,6 +88,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
 
       if (!mounted) return;
 
+      // Jika data yang didapat kurang dari limit, berarti data di DB sudah habis
       if (querySnapshot.docs.length < _documentLimit) {
         _hasMore = false;
       }
@@ -110,6 +111,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     }
   }
 
+  // [UPDATE PROCESS] Dialog Form untuk Mengubah Data Order
   void _showEditOrderDialog(String docId, Map<String, dynamic> data) {
     final addressController = TextEditingController(
       text: data['address'] ?? '',
@@ -214,7 +216,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                   if (selectedStatus == 'completed') {
                     updateData['completed_at'] = FieldValue.serverTimestamp();
                   }
-
+                  // EXEKUSI UPDATE KE FIRESTORE
                   await _firestore
                       .collection('order_history')
                       .doc(docId)
@@ -247,6 +249,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     );
   }
 
+  // [DELETE PROCESS] Konfirmasi & Eksekusi Hapus Order
   void _showDeleteOrderConfirmation(String docId, String orderId) {
     showDialog(
       context: context,

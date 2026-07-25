@@ -62,25 +62,37 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Grafik Analitik",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text(
+                    "Grafik",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                // PERBAIKAN 1: TabBar dibuat simetris & tidak overflow
                 Container(
                   height: 35,
+                  width: 170,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: TabBar(
                     controller: _tabController,
-                    isScrollable: true,
+                    isScrollable: false, // Membagi area rata (50:50)
+                    padding: EdgeInsets.zero,
+                    indicatorPadding: EdgeInsets.zero,
+                    labelPadding: EdgeInsets.zero,
                     indicator: BoxDecoration(
                       color: Colors.green.shade600,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.grey.shade700,
+                    labelStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                     tabs: const [
                       Tab(text: "Pendapatan"),
                       Tab(text: "Total Order"),
@@ -91,7 +103,7 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
             ),
             const SizedBox(height: 24),
             SizedBox(
-              height: 220,
+              height: 230, // Ditambah sedikit dari 220 ke 230
               child: TabBarView(
                 controller: _tabController,
                 children: [_buildRevenueChart(), _buildOrderChart()],
@@ -104,15 +116,26 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
   }
 
   Widget _buildRevenueChart() {
-    if (widget.revenueData.isEmpty)
+    if (widget.revenueData.isEmpty) {
       return const Center(child: Text("Tidak ada data"));
+    }
 
     List<FlSpot> spots = widget.revenueData.map((data) {
       return FlSpot(data.month.toDouble() - 1, data.revenue);
     }).toList();
 
+    double maxRevenue = 0;
+    for (var spot in spots) {
+      if (spot.y > maxRevenue) maxRevenue = spot.y;
+    }
+
+    // PERBAIKAN 2: Menaikkan batas atas Y sebesar 40% (1.4) agar tooltip punya ruang cukup
+    double maxY = maxRevenue > 0 ? maxRevenue * 1.4 : 10000;
+
     return LineChart(
       LineChartData(
+        minY: 0,
+        maxY: maxY,
         gridData: const FlGridData(show: true, drawVerticalLine: false),
         titlesData: FlTitlesData(
           show: true,
@@ -143,7 +166,7 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 45,
+              reservedSize: 35,
               getTitlesWidget: (value, meta) {
                 if (value >= 1000000) {
                   return Text(
@@ -181,6 +204,9 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
+            // PERBAIKAN 3: Memaksa tooltip agar muat di dalam layar (tidak terpotong ke luar)
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
             getTooltipColor: (touchedSpot) => Colors.green.shade800,
             getTooltipItems: (touchedSpots) {
               return touchedSpots.map((spot) {
@@ -189,6 +215,7 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
                   const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
                 );
               }).toList();
@@ -200,8 +227,9 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
   }
 
   Widget _buildOrderChart() {
-    if (widget.orderData.isEmpty)
+    if (widget.orderData.isEmpty) {
       return const Center(child: Text("Tidak ada data"));
+    }
 
     List<BarChartGroupData> barGroups = widget.orderData.map((data) {
       return BarChartGroupData(
@@ -266,6 +294,8 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
         barGroups: barGroups,
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
             getTooltipColor: (group) => Colors.orange.shade800,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(

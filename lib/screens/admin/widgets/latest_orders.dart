@@ -5,8 +5,9 @@ import '../orders/order_detail_page.dart';
 
 class LatestOrders extends StatelessWidget {
   final List<AdminLatestOrder> orders;
+  final VoidCallback? onRefresh; // Tambahan callback untuk refresh dashboard
 
-  const LatestOrders({super.key, required this.orders});
+  const LatestOrders({super.key, required this.orders, this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -23,107 +24,117 @@ class LatestOrders extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             const SizedBox(height: 12),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: orders.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, index) {
-                final order = orders[index];
+            if (orders.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text(
+                    "Belum ada order masuk.",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: orders.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, index) {
+                  final order = orders[index];
 
-                return InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OrderDetailPage(orderId: order.id),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade200),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Bagian Leading / Avatar kiri
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.green.shade100,
-                          child: const Icon(
-                            Icons.shopping_bag,
-                            color: Colors.green,
-                            size: 20,
-                          ),
+                  return InkWell(
+                    onTap: () async {
+                      // Menunggu halaman detail ditutup, lalu pTrigger refresh
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderDetailPage(orderId: order.id),
                         ),
-                        const SizedBox(width: 12),
-
-                        // Bagian Konten Tengah
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      );
+                      if (onRefresh != null) {
+                        onRefresh!();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade200),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.green.shade100,
+                            child: const Icon(
+                              Icons.shopping_bag,
+                              color: Colors.green,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  order.userName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "Driver : ${order.driverName}",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  "Berat : ${order.weight} Kg",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  AdminFormatter.rupiah(order.price),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(
-                                order.userName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                "Driver : ${order.driverName}",
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              Text(
-                                "Berat : ${order.weight} Kg",
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                AdminFormatter.rupiah(order.price),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green.shade700,
-                                  fontSize: 14,
-                                ),
+                              _statusChip(order.status),
+                              const SizedBox(height: 16),
+                              const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 14,
+                                color: Colors.grey,
                               ),
                             ],
                           ),
-                        ),
-
-                        // Bagian Kanan / Trailing (Status & Panah)
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            _statusChip(order.status),
-                            const SizedBox(height: 16),
-                            const Icon(
-                              Icons.arrow_forward_ios,
-                              size: 14,
-                              color: Colors.grey,
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -131,9 +142,10 @@ class LatestOrders extends StatelessWidget {
   }
 }
 
-Widget _statusChip(String status) {
+Widget _statusChip(String rawStatus) {
   Color color;
   String label;
+  final status = rawStatus.toLowerCase().trim();
 
   switch (status) {
     case "completed":
@@ -153,14 +165,14 @@ Widget _statusChip(String status) {
       color = Colors.red;
       break;
     default:
-      label = status;
+      label = rawStatus.isEmpty ? "-" : rawStatus;
       color = Colors.grey;
   }
 
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
+      color: color.withOpacity(0.15),
       borderRadius: BorderRadius.circular(6),
     ),
     child: Text(

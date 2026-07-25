@@ -9,6 +9,13 @@ import '../models/top_user_model.dart';
 
 class DashboardService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Stream<DashboardData> streamDashboard() {
+    return _firestore.collection('order_history').snapshots().asyncMap((
+      _,
+    ) async {
+      return await loadDashboard();
+    });
+  }
 
   Future<DashboardStats> getDashboardStats() async {
     final historyFuture = _firestore.collection('order_history').get();
@@ -19,8 +26,7 @@ class DashboardService {
 
     double totalRevenue = 0;
     double totalWeight = 0;
-    int totalOrdersCount =
-        0; // Mengubah fungsi penampung dari completedOrders ke total semua order
+    int totalOrdersCount = 0;
     int totalUsers = 0;
     int totalDrivers = 0;
 

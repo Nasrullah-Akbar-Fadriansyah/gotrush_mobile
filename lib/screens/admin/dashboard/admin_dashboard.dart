@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/dashboard_stats.dart';
-import '../dashboard/dashboard_service.dart';
+import 'dashboard_data.dart';
+import 'dashboard_service.dart';
 import '../widgets/dashboard_header.dart';
-import '../dashboard/sections/dashboard_stat_section.dart';
+import 'sections/dashboard_stat_section.dart';
+import 'sections/dashboard_chart_section.dart';
 import '../widgets/latest_orders.dart';
-import '../models/admin_latest_order.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -15,68 +15,65 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final DashboardService service = DashboardService();
-  late Future<DashboardStats> statsFuture;
-
-  late Future<List<AdminLatestOrder>> latestOrdersFuture;
+  late Stream<DashboardData> dashboardStream;
 
   @override
   void initState() {
     super.initState();
+    dashboardStream = service.streamDashboard();
+  }
 
-    statsFuture = service.getDashboardStats();
-
-    latestOrdersFuture = service.getLatestOrders();
+  Future<void> _manualRefresh() async {
+    setState(() {
+      dashboardStream = service.streamDashboard();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: FutureBuilder<DashboardStats>(
-          future: statsFuture,
+        child: RefreshIndicator(
+          onRefresh: _manualRefresh,
+          child: StreamBuilder<DashboardData>(
+            stream: dashboardStream,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text("Gagal memuat dashboard: ${snapshot.error}"),
+                );
+              }
 
-            if (snapshot.hasError) {
-              return Center(child: Text(snapshot.error.toString()));
-            }
+              if (!snapshot.hasData) {
+                return const Center(child: Text("Data tidak tersedia"));
+              }
 
-            final stats = snapshot.data!;
+              final data = snapshot.data!;
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-
-              child: Column(
-                children: [
-                  const DashboardHeader(),
-
-                  const SizedBox(height: 20),
-
-                  DashboardStatSection(stats: stats),
-
-                  const SizedBox(height: 20),
-
-                  FutureBuilder<List<AdminLatestOrder>>(
-                    future: latestOrdersFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError) {
-                        return const Text("Gagal memuat order terbaru");
-                      }
-
-                      return LatestOrders(orders: snapshot.data ?? []);
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    const DashboardHeader(),
+                    const SizedBox(height: 20),
+                    DashboardStatSection(stats: data.stats),
+                    const SizedBox(height: 20),
+                    DashboardChartSection(
+                      revenueData: data.revenueChart,
+                      orderData: data.orderChart,
+                    ),
+                    const SizedBox(height: 20),
+                    LatestOrders(orders: data.latestOrders),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
