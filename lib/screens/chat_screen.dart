@@ -25,13 +25,13 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  String _buildMapPreviewUrl(double lat, double lng) {
-    return "https://staticmap.openstreetmap.de/staticmap.php"
-        "?center=$lat,$lng"
-        "&zoom=15"
-        "&size=600x300"
-        "&markers=$lat,$lng,red-pushpin";
-  }
+  // String _buildMapPreviewUrl(double lat, double lng) {
+  //   return "https://staticmap.openstreetmap.de/staticmap.php"
+  //       "?center=$lat,$lng"
+  //       "&zoom=15"
+  //       "&size=600x300"
+  //       "&markers=$lat,$lng,red-pushpin";
+  // }
 
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
@@ -108,6 +108,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Izin lokasi ditolak')));
@@ -115,7 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
 
     await _chatService.sendLocation(

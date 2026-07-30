@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,41 +18,54 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
   Future<void> _handleLogin(AuthService auth) async {
+    FocusScope.of(context).unfocus();
     setState(() => isLoading = true);
+
     try {
       final targetEmail = email.trim().toLowerCase();
-      final userQuery = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: targetEmail)
-          .get();
-      if (userQuery.docs.isEmpty) {
-        await _showErrorDialog(
-          title: 'Login Gagal',
-          message:
-              'Email yang Anda masukkan belum terdaftar. Silakan daftar terlebih dahulu.',
-          actionLabel: 'Daftar',
-          action: () => Navigator.pushNamed(context, '/register'),
-        );
-        return;
-      }
-      final userCredential = await auth.login(targetEmail, password);
+
+      // 1. Tambahkan Timeout 10 detik untuk Login Firebase Auth
+      final userCredential = await auth
+          .login(targetEmail, password)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw TimeoutException(
+              'Koneksi ke server Firebase Auth lambat atau terputus.',
+            ),
+          );
+
       final uid = userCredential?.user?.uid;
 
       if (uid != null) {
+        // 2. Tambahkan Timeout 8 detik untuk Firestore Get Doc
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
-            .get();
+            .get()
+            .timeout(
+              const Duration(seconds: 8),
+              onTimeout: () => throw TimeoutException(
+                'Gagal mengambil data profil dari database (Firestore Timeout).',
+              ),
+            );
+
+        if (!doc.exists) {
+          await _showErrorDialog(
+            title: 'Data Tidak Ditemukan',
+            message: 'Dokumen profil pengguna tidak ditemukan di database.',
+          );
+          return;
+        }
 
         final role = doc.data()?['role'] as String?;
+
+        if (!mounted) return;
+
         if (role == 'driver') {
-          if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/driver');
         } else if (role == 'user') {
-          if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/user');
         } else if (role == 'admin') {
-          if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/admin');
         } else {
           await _showErrorDialog(
@@ -60,19 +74,28 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       }
+    } on TimeoutException catch (e) {
+      await _showErrorDialog(
+        title: 'Koneksi Terhambat',
+        message:
+            '${e.message}\n\nPastikan koneksi internet aktif dan layanan Firebase diizinkan di perangkat Anda.',
+      );
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
+        case 'user-not-found':
+          message = 'Email belum terdaftar. Silakan buat akun terlebih dahulu.';
+          break;
         case 'invalid-credential':
         case 'wrong-password':
-          message = 'Password yang Anda masukkan salah. Silakan coba kembali.';
+          message = 'Email atau password yang Anda masukkan salah.';
           break;
         case 'user-disabled':
           message = 'Akun Anda telah dinonaktifkan oleh admin.';
           break;
         case 'too-many-requests':
           message =
-              'Terlalu banyak percobaan login yang gagal. Coba lagi nanti.';
+              'Terlalu banyak percobaan login gagal. Coba beberapa saat lagi.';
           break;
         case 'invalid-email':
           message = 'Format penulisan email tidak valid.';
@@ -81,11 +104,14 @@ class _LoginScreenState extends State<LoginScreen> {
           message = 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
           break;
         default:
-          message = 'Terjadi kesalahan: ${e.message ?? e.code}';
+          message = 'Terjadi kesalahan Auth: ${e.message ?? e.code}';
       }
       await _showErrorDialog(title: 'Login Gagal', message: message);
     } catch (e) {
-      await _showErrorDialog(title: 'Login Gagal', message: e.toString());
+      await _showErrorDialog(
+        title: 'Login Gagal',
+        message: 'Terjadi kesalahan tidak terduga: ${e.toString()}',
+      );
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -94,8 +120,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _showErrorDialog({
     required String title,
     required String message,
-    String? actionLabel,
-    VoidCallback? action,
   }) async {
     if (mounted) setState(() => isLoading = false);
 
@@ -104,25 +128,11 @@ class _LoginScreenState extends State<LoginScreen> {
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Ikon Error Melingkar yang Cantik
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -136,75 +146,36 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Judul Dialog
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
                 ),
               ),
               const SizedBox(height: 12),
-              // Deskripsi Pesan Error
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 1.4,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
               const SizedBox(height: 24),
-              // Area Tombol Aksi
-              Column(
-                children: [
-                  if (actionLabel != null && action != null) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[700],
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          action();
-                        },
-                        icon: const Icon(Icons.login, size: 18),
-                        label: Text(
-                          actionLabel,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey[700],
-                        side: BorderSide(color: Colors.grey[300]!),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text(
-                        'Tutup',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[700],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ],
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text(
+                    'Tutup',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ),
             ],
           ),
@@ -274,17 +245,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (v == null || v.trim().isEmpty) {
                           return 'Email tidak boleh kosong';
                         }
-                        final val = v.trim().toLowerCase();
-                        final isGmail = val.endsWith('@gmail.com');
-                        if (!isGmail) {
-                          return 'Hanya email @gmail.com yang diizinkan';
-                        }
-                        final emailRegex = RegExp(
-                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                        );
-                        if (!emailRegex.hasMatch(val)) {
-                          return 'Format email tidak valid';
-                        }
                         return null;
                       },
                     ),
@@ -299,19 +259,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         filled: true,
                         fillColor: Colors.green[50],
                         suffixIcon: IconButton(
-                          tooltip: _obscurePassword
-                              ? 'Tampilkan password'
-                              : 'Sembunyikan password',
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                         ),
                       ),
                       obscureText: _obscurePassword,

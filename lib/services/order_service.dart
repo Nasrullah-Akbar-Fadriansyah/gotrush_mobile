@@ -3,6 +3,14 @@ import 'package:flutter/foundation.dart';
 
 class OrderService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  /// Fungsi: Membuat atau menambahkan pesanan (*order*) baru ke dalam database Cloud Firestore secara bersamaan (*atomic batch*).
+  /// Cara Kerja:
+  /// 1. Menerima data masukan (parameter) lengkap mengenai detail pesanan sampah dari pengguna (seperti berat, jarak, harga, alamat, koordinat GPS, foto, nama, dan nomor telepon).
+  /// 2. Menyusun data tersebut ke dalam struktur objek `Map` (JSON) bernama `data`, serta menambahkan informasi default seperti `payment_status: "pending"`, status arsip, dan stempel waktu server (`FieldValue.serverTimestamp()`).
+  /// 3. Menggunakan fitur `WriteBatch` (`_db.batch()`) milik Firestore. Fitur ini mengelompokkan beberapa perintah tulis menjadi satu baris transaksi aman (*All-or-Nothing*).
+  /// 4. Menyiapkan dua target dokumen baru dengan ID pesanan yang sama (`orderId`), yaitu pada tabel/koleksi `'orders'` dan koleksi rekam jejak `'order_history'`.
+  /// 5. Menuliskan data tersebut ke kedua koleksi secara serentak melalui perintah `batch.commit()`. Jika salah satu gagal (misal koneksi terputus di tengah jalan), maka kedua data tersebut dibatalkan secara otomatis agar database tetap konsisten dan tidak korup
   Future<void> createOrder({
     required String orderId,
     required String userId,
@@ -54,6 +62,15 @@ class OrderService {
     await batch.commit();
   }
 
+  /// Fungsi: Mengubah status pesanan ketika driver mengambil atau menerima orderan (`accept order`).
+  /// Fungsi ini mengembalikan nilai boolean (`true` jika berhasil diambil oleh driver, atau `false` jika gagal).
+  /// Cara Kerja:
+  /// 1. Menentukan referensi dokumen pesanan di koleksi `'orders'` dan `'order_history'` berdasarkan `orderId`.
+  /// 2. Menggunakan sistem **Transaction** (`_db.runTransaction`). Berbeda dengan batch, transaksi ini membaca data server terlebih dahulu untuk memastikan kondisi terkini sebelum menulis. Ini sangat krusial agar orderan tidak bisa "berebutan" atau diambil oleh dua driver sekaligus (*Race Condition*).
+  /// 3. Di dalam transaksi, aplikasi mengambil (*get*) data pesanan terbaru dari server.
+  /// 4. Melakukan validasi status: Jika pesanan tidak ada atau statusnya sudah berubah (bukan `'pending'` lagi, misalnya sudah diambil driver lain), transaksi langsung dibatalkan dan mengembalikan nilai `false`.
+  /// 5. Jika status lolos validasi (masih `'pending'`), transaksi akan memperbarui data dokumen dengan memasukkan `driver_id` penjemput, mengubah status menjadi `'active'`, serta mencatat waktu `accepted_at`.
+  /// 6. Menulis perubahan tersebut ke koleksi `'orders'` dan menggabungkannya (*merge*) ke `'order_history'`, lalu mengembalikan nilai `true`. Jika ada kendala jaringan, proses otomatis dialihkan ke blok `catch` dan mengembalikan nilai `false`.
   Future<bool> acceptOrder(String orderId, String driverId) async {
     final orderRef = _db.collection('orders').doc(orderId);
     final historyRef = _db.collection('order_history').doc(orderId);
@@ -179,21 +196,24 @@ class OrderService {
     required String driverId,
     required double weight,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['driver_id'] ?? '') != driverId) {
         throw Exception('Driver tidak berhak mengubah order ini');
       }
-      tx.update(ref, {
+      final update = {
         'driver_weight': weight,
         'weight_status': 'proposed',
         'weight_proposed_at': FieldValue.serverTimestamp(),
         'status': 'awaiting_confirmation',
         'updated_at': FieldValue.serverTimestamp(),
-      });
+      };
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
@@ -201,9 +221,11 @@ class OrderService {
     required String orderId,
     required String userId,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['user_id'] ?? '') != userId) {
@@ -214,14 +236,16 @@ class OrderService {
       const double pricePerKg = 1000;
       final distance = (data['distance'] ?? 0).toDouble();
       final newPrice = (distance * pricePerKm) + (driverWeight * pricePerKg);
-      tx.update(ref, {
+      final update = {
         'final_weight': driverWeight,
         'price': newPrice,
         'price_paid': newPrice,
         'weight_status': 'approved',
         'status': 'waiting_payment',
         'updated_at': FieldValue.serverTimestamp(),
-      });
+      };
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
@@ -230,15 +254,17 @@ class OrderService {
     required String userId,
     String? note,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['user_id'] ?? '') != userId) {
         throw Exception('User tidak berhak pada order ini');
       }
-      final update = {
+      final update = <String, dynamic>{
         'weight_status': 'disputed',
         'status': 'active',
         'updated_at': FieldValue.serverTimestamp(),
@@ -246,38 +272,48 @@ class OrderService {
       if (note != null && note.isNotEmpty) {
         update['weight_note'] = note;
       }
-      tx.update(ref, update);
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
   Future<void> markPaymentSuccessToPickupValidation({
     required String orderId,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
-    await ref.update({
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+    final update = {
       'payment_status': 'success',
       'status': 'pickup_validation',
       'updated_at': FieldValue.serverTimestamp(),
-    });
+    };
+    final batch = _db.batch();
+    batch.update(orderRef, update);
+    batch.set(historyRef, update, SetOptions(merge: true));
+    await batch.commit();
   }
 
   Future<void> driverConfirmPickup({
     required String orderId,
     required String driverId,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['driver_id'] ?? '') != driverId) {
         throw Exception('Driver tidak berhak mengubah order ini');
       }
-      tx.update(ref, {
+      final update = {
         'status': 'waiting_user_validation',
         'pickup_requested_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
-      });
+      };
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
@@ -285,18 +321,22 @@ class OrderService {
     required String orderId,
     required String driverId,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['driver_id'] ?? '') != driverId) {
         throw Exception('Driver tidak berhak mengubah order ini');
       }
-      tx.update(ref, {
+      final update = {
         'status': 'arrived',
         'updated_at': FieldValue.serverTimestamp(),
-      });
+      };
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
@@ -305,26 +345,25 @@ class OrderService {
     required String userId,
     required bool confirmed,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['user_id'] ?? '') != userId) {
         throw Exception('User tidak berhak pada order ini');
       }
-      if (confirmed) {
-        tx.update(ref, {
-          'status': 'picked_up',
-          'picked_up_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      } else {
-        tx.update(ref, {
-          'status': 'arrived',
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      }
+      final update = confirmed
+          ? {
+              'status': 'picked_up',
+              'picked_up_at': FieldValue.serverTimestamp(),
+              'updated_at': FieldValue.serverTimestamp(),
+            }
+          : {'status': 'arrived', 'updated_at': FieldValue.serverTimestamp()};
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
@@ -332,19 +371,23 @@ class OrderService {
     required String orderId,
     required String driverId,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['driver_id'] ?? '') != driverId) {
         throw Exception('Driver tidak berhak mengubah order ini');
       }
-      tx.update(ref, {
+      final update = {
         'status': 'arrived',
         'arrived_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
-      });
+      };
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
   }
 
@@ -352,22 +395,26 @@ class OrderService {
     required String orderId,
     required String driverId,
   }) async {
-    final ref = _db.collection('orders').doc(orderId);
+    final orderRef = _db.collection('orders').doc(orderId);
+    final historyRef = _db.collection('order_history').doc(orderId);
+
     await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
+      final snap = await tx.get(orderRef);
       if (!snap.exists) return;
       final data = snap.data() as Map<String, dynamic>;
       if ((data['driver_id'] ?? '') != driverId) {
         throw Exception('Driver tidak berhak mengubah order ini');
       }
-      tx.update(ref, {
+      final update = {
         'status': 'completed',
         'completed_at': FieldValue.serverTimestamp(),
         'timestamp_end': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
         'hidden_by_user': false,
         'hidden_by_driver': false,
-      });
+      };
+      tx.update(orderRef, update);
+      tx.set(historyRef, update, SetOptions(merge: true));
     });
     await _archiveOrder(orderId);
   }

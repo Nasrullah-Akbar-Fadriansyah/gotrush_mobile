@@ -155,6 +155,56 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           _orderData["address"]?.toString() ?? "N/A",
                         ),
                       ]),
+                      if (status.toLowerCase() != 'pending' &&
+                          _orderData["driver_id"] != null) ...[
+                        const SizedBox(height: 20),
+                        _buildSectionTitle("Informasi Driver"),
+                        FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                          future: FirebaseFirestore.instance
+                              .collection(
+                                'users',
+                              ) // Ganti ke 'drivers' jika koleksinya terpisah
+                              .doc(_orderData["driver_id"].toString())
+                              .get(),
+                          builder: (context, driverSnapshot) {
+                            if (driverSnapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return _buildInfoCard([
+                                _buildInfoRow("Nama Driver", "Memuat..."),
+                                _buildInfoRow("No. HP Driver", "Memuat..."),
+                              ]);
+                            }
+                            if (driverSnapshot.hasData &&
+                                driverSnapshot.data!.exists) {
+                              final driverData = driverSnapshot.data!.data();
+                              return _buildInfoCard([
+                                _buildInfoRow(
+                                  "Nama Driver",
+                                  driverData?["name"]?.toString() ??
+                                      "Driver GoTrash",
+                                ),
+                                _buildInfoRow(
+                                  "No. HP Driver",
+                                  driverData?["phone_number"]?.toString() ??
+                                      driverData?["phone"]?.toString() ??
+                                      "-",
+                                ),
+                              ]);
+                            }
+                            return _buildInfoCard([
+                              _buildInfoRow(
+                                "Nama Driver",
+                                _orderData["driver_name"]?.toString() ??
+                                    "Driver Tidak Ditemukan",
+                              ),
+                              _buildInfoRow(
+                                "No. HP Driver",
+                                _orderData["driver_phone"]?.toString() ?? "-",
+                              ),
+                            ]);
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       _buildSectionTitle("Detail Sampah"),
                       _buildInfoCard([

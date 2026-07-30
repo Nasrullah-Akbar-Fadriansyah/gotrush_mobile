@@ -63,7 +63,7 @@ class _UserHomeState extends State<UserHome> {
     return earthRadiusKm * c;
   }
 
-  Future<void> _handleStatusChange(
+  Future<void> handleStatusChange(
     String orderId,
     String status,
     Map<String, dynamic> data,
@@ -669,14 +669,14 @@ class _MenuCard extends StatelessWidget {
   }
 }
 
-class _ActiveOrderCard extends StatelessWidget {
+class ActiveOrderCard extends StatelessWidget {
   final Map<String, dynamic> orderData;
   final String orderId;
   final VoidCallback onChatPressed;
   final VoidCallback? onPayPressed;
   final VoidCallback? onConfirmPressed;
 
-  const _ActiveOrderCard({
+  const ActiveOrderCard({
     required this.orderData,
     required this.orderId,
     required this.onChatPressed,

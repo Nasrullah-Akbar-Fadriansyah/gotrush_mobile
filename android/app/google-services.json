@@ -12,7 +12,12 @@
           "package_name": "com.example.gotrush"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "515207484899-nf21eiqg4ojk100om9ljvnr3ji7m1p4t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB7UNFbkLLiKF5wODZueBtMNwkOtXdhznI"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "515207484899-nf21eiqg4ojk100om9ljvnr3ji7m1p4t.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "515207484899-cvi93liup4urlj0thlbc106phe20g0aq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.sampahOnline"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +48,20 @@
           "package_name": "com.example.sampah_online"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "515207484899-cvm8n2mqjecf95njs3lblgp7ufl6ivtr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sampah_online",
+            "certificate_hash": "4eaad0eac07328231b28f66607437f83a663739e"
+          }
+        },
+        {
+          "client_id": "515207484899-nf21eiqg4ojk100om9ljvnr3ji7m1p4t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB7UNFbkLLiKF5wODZueBtMNwkOtXdhznI"
@@ -39,7 +69,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "515207484899-nf21eiqg4ojk100om9ljvnr3ji7m1p4t.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "515207484899-cvi93liup4urlj0thlbc106phe20g0aq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.sampahOnline"
+              }
+            }
+          ]
         }
       }
     }

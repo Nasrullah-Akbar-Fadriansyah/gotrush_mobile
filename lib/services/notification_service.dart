@@ -3,26 +3,40 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 
+/// Tempat semua urusan notifikasi dikumpulkan.
+/// Jadi file lain cukup memanggil service ini tanpa perlu tahu detail FCM.
 class NotificationService {
+  // Constructor dibuat private supaya object ini tidak bisa dibuat sembarangan.
   NotificationService._private();
+
+  // Kita hanya butuh satu NotificationService selama aplikasi berjalan.
   static final NotificationService _instance = NotificationService._private();
+
+  // Kalau ada yang memanggil NotificationService(),
+  // selalu kembalikan object yang sama.
   factory NotificationService() => _instance;
 
+  // Plugin yang dipakai untuk menampilkan notifikasi lokal.
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
+  /// Menyiapkan semua kebutuhan notifikasi saat aplikasi pertama kali dijalankan.
   Future<void> init({required AuthService authService}) async {
-    // IMPORTANT: Delay FirebaseMessaging access until after
-    // Firebase.initializeApp() has completed in main().
+    // Mengambil instance Firebase Messaging.
     final fcm = FirebaseMessaging.instance;
 
+    // Minta izin ke pengguna untuk menampilkan notifikasi.
     final settings = await fcm.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+    // Kalau pengguna mengizinkan...
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      // Ambil FCM Token milik perangkat.
       final token = await fcm.getToken();
+      // Token ini nanti dipakai server untuk mengirim notifikasi
+      // ke perangkat yang benar.
       if (token != null) {
         await authService.updateFcmToken(token);
       }

@@ -1,8 +1,11 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../utils/alerts.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,7 +17,6 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // controllers (lebih aman)
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
@@ -23,6 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _role = 'user';
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   final ValueNotifier<bool> _showPassword = ValueNotifier<bool>(false);
   final ValueNotifier<bool> _showConfirmPassword = ValueNotifier<bool>(false);
@@ -39,55 +42,132 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  Future<void> _handleGoogleAutoFill() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _isGoogleLoading = true);
+    final auth = context.read<AuthService>();
+
+    try {
+      final googleUser = await auth.getGoogleAccountData();
+
+      if (googleUser != null) {
+        if (googleUser.displayName != null &&
+            googleUser.displayName!.isNotEmpty) {
+          _nameCtrl.text = googleUser.displayName!;
+        }
+        _emailCtrl.text = googleUser.email;
+
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            'Nama & Email berhasil terisi otomatis!',
+            type: AlertType.success,
+          );
+        }
+      } else {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            'Pengisian otomatis dibatalkan atau gagal terhubung ke Google.',
+            type: AlertType.error,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Gagal mengambil data akun Google: $e',
+          type: AlertType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
   Future<void> _handleRegister() async {
+    // 1. Unfocus keyboard secara penuh & beri jeda agar animasi IME selesai
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Future.delayed(const Duration(milliseconds: 100));
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     final auth = context.read<AuthService>();
 
     try {
-      await auth.register(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
-        name: _nameCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim(),
-        role: _role,
-      );
+      // 2. Tambahkan timeout 12 detik agar tidak terkunci selamanya jika jaringan lambat
+      await auth
+          .register(
+            email: _emailCtrl.text.trim().toLowerCase(),
+            password: _passwordCtrl.text,
+            name: _nameCtrl.text.trim(),
+            phone: _phoneCtrl.text.trim(),
+            role: _role,
+          )
+          .timeout(
+            const Duration(seconds: 12),
+            onTimeout: () => throw TimeoutException(
+              'Koneksi server lambat. Pastikan jaringan internet Anda stabil.',
+            ),
+          );
 
       if (!mounted) return;
+
       showAppSnackBar(
         context,
         'Registrasi berhasil! Silakan login.',
         type: AlertType.success,
       );
 
-      Navigator.pushReplacementNamed(context, '/login');
-    } on Exception catch (e) {
-      String message = e.toString();
-      try {
-        final ex = e as dynamic;
-        if (ex.code != null) {
-          if (ex.code == 'email-already-in-use') {
-            message =
-                'Email sudah terdaftar. Coba login atau gunakan email lain.';
-          } else if (ex.code == 'invalid-email') {
-            message = 'hanya format @gmail.com yang didukung.';
-          } else if (ex.code == 'weak-password') {
-            message = 'Password terlalu lemah.';
-          } else {
-            message = ex.message ?? ex.toString();
-          }
-        }
-      } catch (err) {
-        // fallback jika parsing gagal total
-        message = 'Terjadi kesalahan tidak diketahui';
-        debugPrint('Parsing error: $err');
-      }
-
+      // 3. Pindah ke halaman Login secara mulus menggunakan PageRouteBuilder
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const LoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 150),
+        ),
+      );
+    } on TimeoutException catch (e) {
       if (mounted) {
         showAppSnackBar(
           context,
-          'Gagal registrasi: $message',
+          e.message ?? 'Proses registrasi memakan waktu terlalu lama.',
+          type: AlertType.error,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'email-already-in-use':
+          message =
+              'Email sudah terdaftar. Gunakan email lain atau silakan Login.';
+          break;
+        case 'invalid-email':
+          message = 'Format email tidak valid.';
+          break;
+        case 'weak-password':
+          message = 'Password terlalu lemah. Buat password yang lebih kuat.';
+          break;
+        case 'network-request-failed':
+          message = 'Koneksi internet bermasalah. Periksa jaringan Anda.';
+          break;
+        default:
+          message = e.message ?? 'Terjadi kesalahan registrasi (${e.code}).';
+      }
+
+      if (mounted) {
+        showAppSnackBar(context, message, type: AlertType.error);
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Gagal registrasi: ${e.toString()}',
           type: AlertType.error,
         );
       }
@@ -98,22 +178,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: const Color(0xFFB2E4C6),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-          child: Card(
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
-              child: SizedBox(
-                width: size.width * 0.95,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -138,11 +219,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           color: Color(0xFF0D9D58),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
+
+                      // Button Google Auto-Fill
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey[300]!),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            backgroundColor: Colors.white,
+                          ),
+                          onPressed: (_isLoading || _isGoogleLoading)
+                              ? null
+                              : _handleGoogleAutoFill,
+                          icon: _isGoogleLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.g_mobiledata,
+                                  size: 28,
+                                  color: Colors.redAccent,
+                                ),
+                          label: Text(
+                            _isGoogleLoading
+                                ? 'Mengambil Data...'
+                                : 'Isi Otomatis via Google',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey[300])),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              'atau isi manual',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey[300])),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
 
                       // Name
                       TextFormField(
                         controller: _nameCtrl,
+                        textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
                           labelText: 'Nama Lengkap',
                           prefixIcon: const Icon(Icons.person_outline),
@@ -158,9 +300,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 12),
 
+                      // Phone Number
                       TextFormField(
                         controller: _phoneCtrl,
-                        keyboardType: TextInputType.number,
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                         ],
@@ -177,23 +321,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           if (v == null || v.trim().isEmpty) {
                             return 'Nomor telepon wajib diisi';
                           }
-
-                          if (!RegExp(r'^\d+$').hasMatch(v)) {
-                            return 'Nomor telepon hanya boleh angka';
-                          }
-
                           if (v.length < 10) {
                             return 'Nomor telepon minimal 10 digit';
                           }
-
                           return null;
                         },
                       ),
-
                       const SizedBox(height: 12),
 
+                      // Email
                       TextFormField(
                         controller: _emailCtrl,
+                        textInputAction: TextInputAction.next,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: 'Email',
                           prefixIcon: const Icon(Icons.email_outlined),
@@ -203,28 +343,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           filled: true,
                           fillColor: Colors.green[50],
                         ),
-                        keyboardType: TextInputType.emailAddress,
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
                             return 'Email wajib diisi';
                           }
-                          final regex = RegExp(
-                            r'^[^@]+@gmail\.com$',
-                            caseSensitive: false,
-                          );
-                          if (!regex.hasMatch(v.trim())) {
-                            return 'hanya format @gmail.com yang diterima.';
+                          final val = v.trim().toLowerCase();
+                          if (!val.contains('@') || !val.contains('.')) {
+                            return 'Format email tidak valid';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 12),
 
+                      // Password
                       ValueListenableBuilder<bool>(
                         valueListenable: _showPassword,
                         builder: (_, show, __) {
                           return TextFormField(
                             controller: _passwordCtrl,
+                            textInputAction: TextInputAction.next,
+                            obscureText: !show,
                             decoration: InputDecoration(
                               labelText: 'Password',
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -243,19 +382,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               filled: true,
                               fillColor: Colors.green[50],
                             ),
-                            obscureText: !show,
                             validator: (v) {
                               if (v == null || v.isEmpty) {
                                 return 'Password tidak boleh kosong';
                               }
-                              final passwordRegExp = RegExp(
-                                r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9]).{6,}$',
-                              );
-
-                              if (!passwordRegExp.hasMatch(v)) {
-                                return 'Password 6+ karakter, huruf besar, kecil, dan angka';
+                              if (v.length < 6) {
+                                return 'Password minimal 6 karakter';
                               }
-
                               return null;
                             },
                           );
@@ -263,11 +396,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 12),
 
+                      // Confirm Password
                       ValueListenableBuilder<bool>(
                         valueListenable: _showConfirmPassword,
                         builder: (_, show, __) {
                           return TextFormField(
                             controller: _confirmPasswordCtrl,
+                            textInputAction: TextInputAction.done,
+                            obscureText: !show,
                             decoration: InputDecoration(
                               labelText: 'Konfirmasi Password',
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -286,7 +422,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               filled: true,
                               fillColor: Colors.green[50],
                             ),
-                            obscureText: !show,
                             validator: (v) {
                               if (v == null || v.isEmpty) {
                                 return 'Konfirmasi password wajib diisi';
@@ -301,6 +436,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 12),
 
+                      // Role Selection
                       DropdownButtonFormField<String>(
                         initialValue: _role,
                         decoration: InputDecoration(
@@ -319,11 +455,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ],
                         onChanged: (val) {
-                          setState(() => _role = val ?? 'user');
+                          if (val != null) setState(() => _role = val);
                         },
                       ),
                       const SizedBox(height: 18),
 
+                      // Submit Button
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -334,11 +471,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          onPressed: _isLoading
+                          onPressed: (_isLoading || _isGoogleLoading)
                               ? null
-                              : () {
-                                  _handleRegister();
-                                },
+                              : _handleRegister,
                           child: _isLoading
                               ? const SizedBox(
                                   width: 22,
@@ -358,17 +493,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text('Sudah punya akun?'),
                           TextButton(
-                            onPressed: () => Navigator.pushReplacementNamed(
-                              context,
-                              '/login',
-                            ),
+                            onPressed: () async {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              await Future.delayed(
+                                const Duration(milliseconds: 200),
+                              );
+
+                              if (!context.mounted) return;
+
+                              Navigator.of(context).pushReplacement(
+                                PageRouteBuilder(
+                                  pageBuilder:
+                                      (
+                                        context,
+                                        animation,
+                                        secondaryAnimation,
+                                      ) => const LoginScreen(),
+                                  transitionsBuilder:
+                                      (
+                                        context,
+                                        animation,
+                                        secondaryAnimation,
+                                        child,
+                                      ) {
+                                        return FadeTransition(
+                                          opacity: animation,
+                                          child: child,
+                                        );
+                                      },
+                                  transitionDuration: const Duration(
+                                    milliseconds: 150,
+                                  ),
+                                ),
+                              );
+                            },
                             child: const Text(
                               'Login',
                               style: TextStyle(

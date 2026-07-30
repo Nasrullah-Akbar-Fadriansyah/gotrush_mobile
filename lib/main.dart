@@ -11,7 +11,14 @@ import 'package:sampah_online/screens/register_screen.dart';
 import 'package:sampah_online/screens/user/user_home.dart';
 import 'package:sampah_online/screens/driver/driver_home.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:sampah_online/screens/admin/dashboard/admin_dashboard.dart';
 
+/// Fungsi: Titik masuk utama (Entry Point) seluruh siklus hidup aplikasi GoTrash.
+/// Cara Kerja:
+/// 1. Memastikan *binding* framework Flutter telah siap (`WidgetsFlutterBinding.ensureInitialized`).
+/// 2. Melakukan inisialisasi awal ke server Firebase sesuai platform perangkat (Android/iOS).
+/// 3. Mempersiapkan pengaturan format tanggal lokal Bahasa Indonesia (`id_ID`).
+/// 4. Setelah konfigurasi dasar selesai, fungsi memanggil `runApp` untuk merender struktur utama `MyApp`.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -40,6 +47,13 @@ class _MyAppState extends State<MyApp> {
     _initializeSecondaryServices();
   }
 
+  /// Fungsi: Mempersiapkan layanan sekunder latar belakang (App Check dan Notifikasi).
+  /// Cara Kerja:
+  /// 1. Menggunakan `Future.wait` untuk menjalankan dua proses asinkron secara bersamaan (paralel):
+  ///    - Mengaktifkan Firebase App Check mode debug guna memproteksi API backend Firebase dari penyalahgunaan.
+  ///    - Menginisialisasi `NotificationService` untuk menerima Firebase Cloud Messaging (FCM) dengan mengaitkan `_authService`.
+  /// 2. Jika sukses, mengubah status `_isReady = true` dan memperbarui tampilan UI via `setState`.
+  /// 3. Jika gagal/error, pesan error ditangkap di blok `catch` agar aplikasi tidak crash dan status disesuaikan supaya UI tidak tertahan selamanya di mode loading
   Future<void> _initializeSecondaryServices() async {
     try {
       await Future.wait([
@@ -64,6 +78,10 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    /// Fungsi: Menyediakan manajemen state global menggunakan arsitektur Provider.
+    /// Cara Kerja: Menggunakan `MultiProvider` untuk menyuntikkan kelas `AuthService` (ChangeNotifier)
+    /// ke seluruh pohon widget di bawahnya, sehingga halaman mana pun (seperti login/register)
+    /// bisa mengakses logika autentikasi secara mudah tanpa *parsing* manual.
     return MultiProvider(
       providers: [ChangeNotifierProvider.value(value: _authService)],
       child: MaterialApp(
@@ -78,6 +96,7 @@ class _MyAppState extends State<MyApp> {
           '/register': (context) => const RegisterScreen(),
           '/user': (context) => const UserHome(),
           '/driver': (context) => const DriverHomeScreen(),
+          '/admin': (context) => const AdminDashboard(),
         },
         debugShowCheckedModeBanner: false,
       ),

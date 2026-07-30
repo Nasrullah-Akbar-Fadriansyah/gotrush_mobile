@@ -4,6 +4,12 @@ import 'package:http/http.dart' as http;
 
 const String kMidtransApiUrl = 'https://api-midtrans-teal.vercel.app/api';
 
+/// Fungsi: Mendapatkan URL halaman pembayaran Midtrans Snap secara asinkron.
+/// Cara Kerja:
+/// 1. Menerima parameter wajib seperti `orderId`, `grossAmount`, `name`, dan `email` untuk dibungkus menjadi objek `Map/JSON`.
+/// 2. Melakukan *request* HTTP POST ke backend endpoint (`kMidtransApiUrl`) dengan menyertakan data transaksi tersebut dalam format JSON terenkripsi.
+/// 3. Menunggu respon dari server backend. Jika kode status respon sukses (`200 OK`) dan data JSON hasil *decode* memuat token tautan halaman pembayaran (`redirect_url`), fungsi akan mengembalikan teks URL tersebut.
+/// 4. Jika koneksi bermasalah, kode status selain 200, atau terjadi *exception/crash*, fungsi akan menangkap error tersebut, mencetaknya ke konsol debug, lalu mengembalikan nilai `null`.
 Future<String?> getMidtransSnapUrl({
   required String orderId,
   required int grossAmount,
