@@ -60,7 +60,8 @@ class DashboardStatSection extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => AdminUsersManagementPage(roleFilter: 'user'),
+                builder: (_) =>
+                    const AdminUsersManagementPage(roleFilter: 'user'),
               ),
             );
           },
@@ -75,7 +76,8 @@ class DashboardStatSection extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => AdminUsersManagementPage(roleFilter: 'driver'),
+                builder: (_) =>
+                    const AdminUsersManagementPage(roleFilter: 'driver'),
               ),
             );
           },

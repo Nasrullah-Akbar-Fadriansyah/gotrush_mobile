@@ -140,7 +140,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedStatus,
+                  initialValue: selectedStatus,
                   decoration: const InputDecoration(labelText: 'Status Order'),
                   items: ['pending', 'active', 'completed', 'cancelled'].map((
                     status,
@@ -333,7 +333,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -467,7 +467,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                           leading: CircleAvatar(
                             backgroundColor: _getStatusColor(
                               orderStatus,
-                            ).withOpacity(0.15),
+                            ).withValues(alpha: 0.15),
                             child: Icon(
                               Icons.shopping_bag,
                               color: _getStatusColor(orderStatus),

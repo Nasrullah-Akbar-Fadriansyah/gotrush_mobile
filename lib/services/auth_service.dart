@@ -1,14 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
 
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> get userChanges => _auth.userChanges();
+
+  Future<GoogleSignInAccount?> getGoogleAccountData() async {
+    try {
+      if (await _googleSignIn.isSignedIn()) {
+        await _googleSignIn.signOut();
+      }
+      final googleUser = await _googleSignIn.signIn();
+      return googleUser;
+    } catch (e) {
+      debugPrint("🔥 Error Get Google Account: $e");
+      return null;
+    }
+  }
 
   Future<UserCredential?> register({
     required String email,

@@ -46,6 +46,7 @@ dependencies:
   geoflutterfire_plus: ^0.0.32
   geolocator: ^13.0.1
   url_launcher: ^6.3.0
+  google_sign_in: ^6.2.1
   # flutter_map: ^8.2.2
   latlong2: ^0.9.1
   webview_flutter: ^4.13.0

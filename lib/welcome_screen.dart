@@ -171,6 +171,6 @@ class WelcomeScreen extends StatelessWidget {
         ],
       );
     }
-    return const SizedBox.shrink(); // Return empty space when ready
+    return const SizedBox.shrink(); // fungsi ini mengembalikan widget kosong jika aplikasi siap dan tidak ada error
   }
 }

@@ -198,7 +198,7 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
             dotData: const FlDotData(show: true),
             belowBarData: BarAreaData(
               show: true,
-              color: Colors.green.shade600.withOpacity(0.15),
+              color: Colors.green.shade600.withValues(alpha: 0.15),
             ),
           ),
         ],
