@@ -1,209 +1,275 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:flutter_osm_plugin/flutter_osm_plugin.dart' as osm;
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 class MapSelectionScreen extends StatefulWidget {
   const MapSelectionScreen({super.key});
+
   @override
   State<MapSelectionScreen> createState() => _MapSelectionScreenState();
 }
 
 class _MapSelectionScreenState extends State<MapSelectionScreen> {
-  late osm.MapController _mapController;
-  osm.GeoPoint? _selectedLocation;
+  final MapController _mapController = MapController();
+
+  // Lokasi default sementara sebelum GPS berhasil didapat
+  LatLng _currentCenter = const LatLng(-6.200000, 106.816666);
+
   String? _selectedAddress;
-  bool _isLoadingAddress = false;
-  Timer? _addressLookupTimer;
+  bool _loadingAddress = false;
+  bool _loadingLocation = true; // Status loading GPS
+
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _mapController = osm.MapController(
-      // initPosition: _initialPosition,
-      initMapWithUserPosition: const osm.UserTrackingOption(
-        enableTracking: true,
-        unFollowUser: false,
-      ),
-    );
+    _getCurrentUserLocation();
   }
 
-  void _getAddressFromLocation(osm.GeoPoint point) {
-    _addressLookupTimer?.cancel();
-    _addressLookupTimer = Timer(const Duration(milliseconds: 1000), () async {
+  /// Mengambil lokasi nyata dari GPS Device
+  Future<void> _getCurrentUserLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // 1. Cek apakah layanan GPS aktif
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _setDefaultLocation("Layanan GPS tidak aktif.");
+      return;
+    }
+
+    // 2. Cek izin akses lokasi
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _setDefaultLocation("Izin lokasi ditolak.");
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _setDefaultLocation("Izin lokasi ditolak secara permanen.");
+      return;
+    }
+
+    // 3. Ambil posisi GPS pengguna
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      LatLng userLatLng = LatLng(position.latitude, position.longitude);
+
       if (!mounted) return;
-      setState(() => _isLoadingAddress = true);
+
+      setState(() {
+        _currentCenter = userLatLng;
+        _loadingLocation = false;
+      });
+
+      // Pindahkan kamera peta ke titik GPS pengguna
+      _mapController.move(userLatLng, 16);
+
+      // Ambil nama alamat berdasarkan posisi baru
+      _reverseGeocode(userLatLng);
+    } catch (e) {
+      _setDefaultLocation("Gagal mengambil posisi GPS.");
+    }
+  }
+
+  void _setDefaultLocation(String errorMessage) {
+    if (!mounted) return;
+    setState(() {
+      _loadingLocation = false;
+    });
+    _reverseGeocode(_currentCenter);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(errorMessage)));
+  }
+
+  Future<void> _reverseGeocode(LatLng point) async {
+    _debounce?.cancel();
+
+    _debounce = Timer(const Duration(milliseconds: 10), () async {
+      if (!mounted) return;
+
+      setState(() {
+        _loadingAddress = true;
+      });
+
       try {
         final placemarks = await placemarkFromCoordinates(
           point.latitude,
           point.longitude,
         );
+
         if (!mounted) return;
+
         if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          final address =
-              [
-                    place.street,
-                    place.subLocality,
-                    place.locality,
-                    place.subAdministrativeArea,
-                    place.administrativeArea,
-                    place.country,
-                  ]
-                  .where((element) => element != null && element.isNotEmpty)
-                  .join(', ');
-          setState(() => _selectedAddress = address);
+          final p = placemarks.first;
+
+          final address = [
+            p.street,
+            p.subLocality,
+            p.locality,
+            p.subAdministrativeArea,
+            p.administrativeArea,
+            p.country,
+          ].where((e) => e != null && e.isNotEmpty).join(", ");
+
+          setState(() {
+            _selectedAddress = address.isEmpty
+                ? "Alamat tidak ditemukan"
+                : address;
+          });
         } else {
-          setState(() => _selectedAddress = 'Alamat tidak ditemukan');
+          setState(() {
+            _selectedAddress = "Alamat tidak ditemukan";
+          });
         }
       } catch (e) {
+        debugPrint(e.toString());
+
         if (!mounted) return;
-        setState(() => _selectedAddress = 'Gagal mendapatkan alamat');
-        debugPrint('Error getting address: $e');
-      } finally {
-        if (mounted) {
-          setState(() => _isLoadingAddress = false);
-        }
+
+        setState(() {
+          _selectedAddress = "Gagal mengambil alamat";
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _loadingAddress = false;
+        });
       }
     });
   }
 
-  void _confirmLocation() {
-    if (_selectedLocation != null) {
-      final result = {
-        'location': firestore.GeoPoint(
-          _selectedLocation!.latitude,
-          _selectedLocation!.longitude,
-        ),
-        'address': _selectedAddress ?? 'Alamat tidak tersedia',
-      };
-      Navigator.of(context).pop(result);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan tentukan lokasi penjemputan')),
-      );
-    }
+  void _confirm() {
+    Navigator.pop(context, {
+      "location": firestore.GeoPoint(
+        _currentCenter.latitude,
+        _currentCenter.longitude,
+      ),
+      "address": _selectedAddress ?? "",
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tentukan Lokasi Penjemputan')),
+      appBar: AppBar(title: const Text("Pilih Lokasi")),
       body: Stack(
         children: [
-          // 1. Peta OSMFlutter
-          osm.OSMFlutter(
-            controller: _mapController,
-            osmOption: const osm.OSMOption(
-              zoomOption: osm.ZoomOption(initZoom: 15),
+          // 1. PETA (FlutterMap)
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentCenter,
+              initialZoom: 16,
+              onPositionChanged: (position, hasGesture) {
+                _currentCenter = position.center;
+                _reverseGeocode(_currentCenter);
+              },
             ),
-            onMapIsReady: (isReady) async {
-              if (isReady && mounted) {
-                try {
-                  final centerPoint = await _mapController.centerMap;
-                  if (mounted) {
-                    setState(() {
-                      _selectedLocation = centerPoint;
-                    });
-                  }
-                } catch (e) {
-                  debugPrint('Error getting center map: $e');
-                }
-              }
-            },
-            onGeoPointClicked: (osm.GeoPoint point) {
-              if (mounted) {
-                setState(() {
-                  _selectedLocation = point;
-                });
-                _getAddressFromLocation(point);
-              }
-            },
-            onMapMoved: (newRegion) {
-              if (mounted) {
-                setState(() {
-                  _selectedLocation = newRegion.center;
-                });
-                _getAddressFromLocation(newRegion.center);
-              }
-            },
-            mapIsLoading: const Center(child: CircularProgressIndicator()),
+            children: [
+              TileLayer(
+                urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                userAgentPackageName: "com.example.sampah_online",
+              ),
+            ],
           ),
-          const Center(
-            child: Icon(Icons.location_pin, color: Colors.red, size: 50),
+
+          // 2. PIN INDIKATOR DI TENGAH
+          const IgnorePointer(
+            child: Center(
+              child: Icon(Icons.location_pin, color: Colors.red, size: 54),
+            ),
           ),
+
+          // 3. CARD NAMA JALAN / ALAMAT
           Positioned(
-            bottom: 30,
-            left: 20,
-            right: 20,
-            child: Column(
-              children: [
-                if (_selectedAddress != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _loadingAddress
+                            ? "Mencari alamat..."
+                            : (_selectedAddress ?? "Geser peta"),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.location_on, color: Colors.green),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _isLoadingAddress
-                                ? 'Mencari alamat...'
-                                : _selectedAddress!,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ElevatedButton.icon(
-                  onPressed: _selectedLocation != null
-                      ? _confirmLocation
-                      : null,
-                  icon: const Icon(Icons.check_circle),
-                  label: Text(
-                    _selectedLocation == null
-                        ? 'Memuat Peta...'
-                        : 'Konfirmasi Lokasi Ini',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700],
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    minimumSize: const Size(double.infinity, 50),
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
+
+          // 4. TOMBOL GPS MY LOCATION
+          Positioned(
+            right: 16,
+            bottom: 90,
+            child: FloatingActionButton(
+              mini: true,
+              onPressed: _getCurrentUserLocation,
+              child: const Icon(Icons.my_location),
+            ),
+          ),
+
+          // 5. TOMBOL KONFIRMASI
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 20,
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: (_loadingAddress || _loadingLocation)
+                    ? null
+                    : _confirm,
+                icon: const Icon(Icons.check),
+                label: const Text("Konfirmasi Lokasi"),
+              ),
+            ),
+          ),
+
+          // 6. OVERLAY LOADING GPS
+          if (_loadingLocation)
+            Container(
+              color: Colors.black.withValues(alpha: 0.5),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _addressLookupTimer?.cancel();
-    _mapController.dispose();
-    super.dispose();
   }
 }

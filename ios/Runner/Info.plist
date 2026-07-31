@@ -48,5 +48,7 @@
 	<!-- Microphone usage description for recording Voice Notes -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Aplikasi memerlukan akses mikrofon untuk merekam Voice Note.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Aplikasi memerlukan akses lokasi untuk menentukan posisi Anda pada peta.</string>
 </dict>
 </plist>

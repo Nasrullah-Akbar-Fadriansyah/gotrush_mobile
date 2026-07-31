@@ -1,9 +1,12 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_osm_plugin/flutter_osm_plugin.dart' as osm;
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '/utils/alerts.dart';
+import 'package:http/http.dart' as http;
 
 class MapTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -22,11 +25,24 @@ class MapTrackingScreen extends StatefulWidget {
 }
 
 class _MapTrackingScreenState extends State<MapTrackingScreen> {
-  late osm.MapController _mapController;
+  final MapController _mapController = MapController();
 
-  // gunakan tipe osm.GeoPoint untuk peta
-  osm.GeoPoint? _driverLocation;
-  osm.GeoPoint? _userLocation;
+  LatLng? _driverLocation;
+  LatLng? _userLocation;
+  List<LatLng> _routePoints = [];
+
+  /// Debounce request routing
+  Timer? _routeDebounce;
+
+  /// Cache route terakhir
+  LatLng? _lastRouteOrigin;
+  LatLng? _lastRouteDestination;
+
+  /// Waktu request terakhir
+  DateTime? _lastRouteRequest;
+
+  /// Agar route tidak diambil bersamaan
+  bool _isLoadingRoute = false;
 
   double _distanceToUser = 0.0;
   bool _isNearNotified = false;
@@ -37,85 +53,88 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
   @override
   void initState() {
     super.initState();
-    // Inisialisasi MapController (pakai osm.GeoPoint)
-    _mapController = osm.MapController(
-      initMapWithUserPosition: const osm.UserTrackingOption(
-        enableTracking: true,
-        unFollowUser: false,
-      ),
-      initPosition: osm.GeoPoint(latitude: -6.200000, longitude: 106.816666),
-    );
     _listenToLocations();
   }
 
   void _listenToLocations() {
-    final driverStream = FirebaseFirestore.instance
+    _driverSub = FirebaseFirestore.instance
         .collection('drivers_location')
         .doc(widget.driverId)
-        .snapshots();
+        .snapshots()
+        .listen(
+          (snap) async {
+            if (!mounted) return;
+            if (!snap.exists || snap.data() == null) return;
 
-    final userStream = FirebaseFirestore.instance
+            final data = snap.data()!;
+
+            final rawLat = data['lat'] ?? data['latitude'] ?? 0;
+            final rawLng = data['lng'] ?? data['longitude'] ?? 0;
+
+            final lat = rawLat is num
+                ? rawLat.toDouble()
+                : double.tryParse(rawLat.toString()) ?? 0.0;
+
+            final lng = rawLng is num
+                ? rawLng.toDouble()
+                : double.tryParse(rawLng.toString()) ?? 0.0;
+
+            if (lat == 0 || lng == 0) return;
+
+            setState(() {
+              _driverLocation = LatLng(lat, lng);
+            });
+
+            _checkDistanceAndNotify();
+            _moveCamera();
+            _scheduleRouteUpdate();
+          },
+          onError: (e) {
+            debugPrint("Driver Stream Error : $e");
+          },
+        );
+
+    _userSub = FirebaseFirestore.instance
         .collection('users_location')
         .doc(widget.userId)
-        .snapshots();
+        .snapshots()
+        .listen(
+          (snap) async {
+            if (!mounted) return;
+            if (!snap.exists || snap.data() == null) return;
 
-    _driverSub = driverStream.listen(
-      (snap) async {
-        if (!mounted) return;
-        if (snap.exists && snap.data() != null) {
-          final d = snap.data()!;
-          final rawLat = d['lat'] ?? d['latitude'] ?? 0;
-          final rawLng = d['lng'] ?? d['longitude'] ?? 0;
-          final lat = (rawLat is num)
-              ? rawLat.toDouble()
-              : double.tryParse(rawLat.toString()) ?? 0.0;
-          final lng = (rawLng is num)
-              ? rawLng.toDouble()
-              : double.tryParse(rawLng.toString()) ?? 0.0;
-          if (lat != 0.0 && lng != 0.0) {
-            setState(() {
-              _driverLocation = osm.GeoPoint(latitude: lat, longitude: lng);
-            });
-          }
-          await _checkDistanceAndNotify();
-          await _updateMapMarkers();
-        }
-      },
-      onError: (e) {
-        debugPrint('driver location stream error: $e');
-      },
-    );
+            final data = snap.data()!;
 
-    _userSub = userStream.listen(
-      (snap) async {
-        if (!mounted) return;
-        if (snap.exists && snap.data() != null) {
-          final d = snap.data()!;
-          final rawLat = d['lat'] ?? d['latitude'] ?? 0;
-          final rawLng = d['lng'] ?? d['longitude'] ?? 0;
-          final lat = (rawLat is num)
-              ? rawLat.toDouble()
-              : double.tryParse(rawLat.toString()) ?? 0.0;
-          final lng = (rawLng is num)
-              ? rawLng.toDouble()
-              : double.tryParse(rawLng.toString()) ?? 0.0;
-          if (lat != 0.0 && lng != 0.0) {
+            final rawLat = data['lat'] ?? data['latitude'] ?? 0;
+            final rawLng = data['lng'] ?? data['longitude'] ?? 0;
+
+            final lat = rawLat is num
+                ? rawLat.toDouble()
+                : double.tryParse(rawLat.toString()) ?? 0.0;
+
+            final lng = rawLng is num
+                ? rawLng.toDouble()
+                : double.tryParse(rawLng.toString()) ?? 0.0;
+
+            if (lat == 0 || lng == 0) return;
+
             setState(() {
-              _userLocation = osm.GeoPoint(latitude: lat, longitude: lng);
+              _userLocation = LatLng(lat, lng);
             });
-          }
-          await _checkDistanceAndNotify();
-          await _updateMapMarkers();
-        }
-      },
-      onError: (e) {
-        debugPrint('user location stream error: $e');
-      },
-    );
+
+            _checkDistanceAndNotify();
+            _moveCamera();
+            _scheduleRouteUpdate();
+          },
+          onError: (e) {
+            debugPrint("User Stream Error : $e");
+          },
+        );
   }
 
-  Future<void> _checkDistanceAndNotify() async {
+  void _checkDistanceAndNotify() {
     if (_driverLocation == null || _userLocation == null) return;
+
     final distance = Geolocator.distanceBetween(
       _driverLocation!.latitude,
       _driverLocation!.longitude,
@@ -123,20 +142,19 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
       _userLocation!.longitude,
     );
 
-    if (mounted) {
-      setState(() {
-        _distanceToUser = distance;
-      });
-    }
+    setState(() {
+      _distanceToUser = distance;
+    });
 
     const threshold = 200.0;
 
     if (distance <= threshold && !_isNearNotified) {
       showAppSnackBar(
         context,
-        'Driver hampir sampai! Jarak: ${distance.toStringAsFixed(0)} meter.',
+        "Driver hampir sampai! Jarak ${distance.toStringAsFixed(0)} meter.",
         type: AlertType.warning,
       );
+
       _isNearNotified = true;
     }
 
@@ -145,79 +163,112 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
     }
   }
 
-  Future<void> _updateMapMarkers() async {
+  double _distanceBetween(LatLng a, LatLng b) {
+    return Geolocator.distanceBetween(
+      a.latitude,
+      a.longitude,
+      b.latitude,
+      b.longitude,
+    );
+  }
+
+  void _scheduleRouteUpdate() {
+    if (_driverLocation == null || _userLocation == null) return;
+    _routeDebounce = Timer(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+
+      bool needUpdate = false;
+
+      if (_lastRouteOrigin == null || _lastRouteDestination == null) {
+        needUpdate = true;
+      }
+
+      if (!needUpdate &&
+          _distanceBetween(_driverLocation!, _lastRouteOrigin!) > 30) {
+        needUpdate = true;
+      }
+
+      if (!needUpdate &&
+          _distanceBetween(_userLocation!, _lastRouteDestination!) > 30) {
+        needUpdate = true;
+      }
+
+      if (!needUpdate &&
+          _lastRouteRequest != null &&
+          DateTime.now().difference(_lastRouteRequest!) >
+              const Duration(seconds: 10)) {
+        needUpdate = true;
+      }
+
+      if (!needUpdate) return;
+
+      _lastRouteOrigin = _driverLocation;
+      _lastRouteDestination = _userLocation;
+      _lastRouteRequest = DateTime.now();
+
+      await _loadRoute();
+    });
+  }
+
+  void _moveCamera() {
+    if (!mounted) return;
+
+    if (_driverLocation != null && _userLocation != null) {
+      final distance = _distanceBetween(_driverLocation!, _userLocation!);
+
+      if (distance < 20) return;
+
+      final bounds = LatLngBounds.fromPoints([
+        _driverLocation!,
+        _userLocation!,
+      ]);
+
+      _mapController.fitCamera(
+        CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(80)),
+      );
+    } else if (_driverLocation != null) {
+      _mapController.move(_driverLocation!, 16);
+    } else if (_userLocation != null) {
+      _mapController.move(_userLocation!, 16);
+    }
+  }
+
+  Future<void> _loadRoute() async {
+    if (_driverLocation == null || _userLocation == null) return;
+    if (_isLoadingRoute) return;
+
+    _isLoadingRoute = true;
+
+    final url =
+        "https://router.project-osrm.org/route/v1/driving/"
+        "${_driverLocation!.longitude},${_driverLocation!.latitude};"
+        "${_userLocation!.longitude},${_userLocation!.latitude}"
+        "?overview=full&geometries=geojson";
+
     try {
-      if (_driverLocation != null) {
-        await _mapController.removeMarker(
-          osm.GeoPoint(
-            latitude: _driverLocation!.latitude,
-            longitude: _driverLocation!.longitude,
-          ),
-        );
-      }
+      final response = await http.get(Uri.parse(url));
 
-      if (_userLocation != null) {
-        await _mapController.removeMarker(
-          osm.GeoPoint(
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-          ),
-        );
-      }
+      if (response.statusCode != 200) return;
 
-      if (_driverLocation != null) {
-        await _mapController.addMarker(
-          osm.GeoPoint(
-            latitude: _driverLocation!.latitude,
-            longitude: _driverLocation!.longitude,
-          ),
-          markerIcon: const osm.MarkerIcon(
-            icon: Icon(Icons.local_shipping, color: Colors.red, size: 48),
-          ),
-        );
-      }
+      final data = jsonDecode(response.body);
 
-      if (_userLocation != null) {
-        await _mapController.addMarker(
-          osm.GeoPoint(
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-          ),
-          markerIcon: const osm.MarkerIcon(
-            icon: Icon(Icons.person_pin_circle, color: Colors.blue, size: 48),
-          ),
-        );
-      }
+      final coordinates = data["routes"][0]["geometry"]["coordinates"] as List;
 
-      if (_driverLocation != null && _userLocation != null) {
-        final box = osm.BoundingBox.fromGeoPoints([
-          osm.GeoPoint(
-            latitude: _driverLocation!.latitude,
-            longitude: _driverLocation!.longitude,
-          ),
-          osm.GeoPoint(
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-          ),
-        ]);
-        await _mapController.zoomToBoundingBox(box);
-      } else if (_driverLocation != null) {
-        await _mapController.moveTo(
-          osm.GeoPoint(
-            latitude: _driverLocation!.latitude,
-            longitude: _driverLocation!.longitude,
-          ),
-        );
-      } else if (_userLocation != null) {
-        await _mapController.moveTo(
-          osm.GeoPoint(
-            latitude: _userLocation!.latitude,
-            longitude: _userLocation!.longitude,
-          ),
-        );
-      }
+      final points = coordinates
+          .map(
+            (e) => LatLng((e[1] as num).toDouble(), (e[0] as num).toDouble()),
+          )
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _routePoints = points;
+      });
     } catch (e) {
-      debugPrint("Error updating markers: $e");
+      debugPrint("Route Error : $e");
+    } finally {
+      _isLoadingRoute = false;
     }
   }
 
@@ -229,24 +280,57 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
           'Live Tracking - Jarak: ${_distanceToUser.toStringAsFixed(0)} m',
         ),
       ),
-      body: osm.OSMFlutter(
-        controller: _mapController,
-        osmOption: osm.OSMOption(
-          zoomOption: const osm.ZoomOption(
-            initZoom: 14,
-            minZoomLevel: 3,
-            maxZoomLevel: 18,
-          ),
-          userLocationMarker: osm.UserLocationMaker(
-            personMarker: const osm.MarkerIcon(
-              icon: Icon(Icons.person_pin, color: Colors.blue),
-            ),
-            directionArrowMarker: const osm.MarkerIcon(
-              icon: Icon(Icons.navigation, color: Colors.black),
-            ),
-          ),
+      body: FlutterMap(
+        mapController: _mapController,
+        options: const MapOptions(
+          initialCenter: LatLng(-6.200000, 106.816666),
+          initialZoom: 14,
         ),
-        mapIsLoading: const Center(child: CircularProgressIndicator()),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.sampah_online',
+          ),
+
+          if (_routePoints.isNotEmpty)
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: _routePoints,
+                  strokeWidth: 5,
+                  color: Colors.green,
+                ),
+              ],
+            ),
+
+          MarkerLayer(
+            markers: [
+              if (_driverLocation != null)
+                Marker(
+                  point: _driverLocation!,
+                  width: 60,
+                  height: 60,
+                  child: const Icon(
+                    Icons.local_shipping,
+                    color: Colors.red,
+                    size: 40,
+                  ),
+                ),
+
+              if (_userLocation != null)
+                Marker(
+                  point: _userLocation!,
+                  width: 60,
+                  height: 60,
+                  child: const Icon(
+                    Icons.person_pin_circle,
+                    color: Colors.blue,
+                    size: 42,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -255,7 +339,7 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
   void dispose() {
     _driverSub?.cancel();
     _userSub?.cancel();
-    _mapController.dispose();
+    _routeDebounce?.cancel(); // Pastikan timer dibatalkan di sini
     super.dispose();
   }
 }

@@ -45,7 +45,7 @@ class _ReportsPageState extends State<ReportsPage> {
       );
 
       final snapshot = await _firestore
-          .collection('order_history')
+          .collection('orders')
           .where('created_at', isGreaterThanOrEqualTo: startTimestamp)
           .where('created_at', isLessThanOrEqualTo: endTimestamp)
           .get();

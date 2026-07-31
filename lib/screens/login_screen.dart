@@ -23,8 +23,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final targetEmail = email.trim().toLowerCase();
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: targetEmail)
+          .limit(1)
+          .get()
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw TimeoutException(
+              'Gagal memeriksa email di database (Timeout).',
+            ),
+          );
 
-      // 1. Tambahkan Timeout 10 detik untuk Login Firebase Auth
+      if (userQuery.docs.isEmpty) {
+        if (!mounted) return;
+        await _showUnregisteredEmailDialog();
+        return;
+      }
+
       final userCredential = await auth
           .login(targetEmail, password)
           .timeout(
@@ -37,7 +53,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final uid = userCredential?.user?.uid;
 
       if (uid != null) {
-        // 2. Tambahkan Timeout 8 detik untuk Firestore Get Doc
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
@@ -83,13 +98,13 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
-        case 'user-not-found':
-          message = 'Email belum terdaftar. Silakan buat akun terlebih dahulu.';
-          break;
         case 'invalid-credential':
         case 'wrong-password':
-          message = 'Email atau password yang Anda masukkan salah.';
+          message = 'Password yang Anda masukkan salah, coba masukkan ulang.';
           break;
+        case 'user-not-found':
+          await _showUnregisteredEmailDialog();
+          return;
         case 'user-disabled':
           message = 'Akun Anda telah dinonaktifkan oleh admin.';
           break;
@@ -115,6 +130,84 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  Future<void> _showUnregisteredEmailDialog() async {
+    if (mounted) setState(() => isLoading = false);
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person_search_rounded,
+                  color: Colors.orange[800],
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Email Tidak Terdaftar',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Email Anda salah / belum terdaftar. Apakah Anda ingin mendaftar akun baru?',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Batal'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[700],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.pushNamed(context, '/register');
+                      },
+                      child: const Text(
+                        'Daftar',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showErrorDialog({

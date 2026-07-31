@@ -10,15 +10,13 @@ import '../models/top_user_model.dart';
 class DashboardService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   Stream<DashboardData> streamDashboard() {
-    return _firestore.collection('order_history').snapshots().asyncMap((
-      _,
-    ) async {
+    return _firestore.collection('orders').snapshots().asyncMap((_) async {
       return await loadDashboard();
     });
   }
 
   Future<DashboardStats> getDashboardStats() async {
-    final historyFuture = _firestore.collection('order_history').get();
+    final historyFuture = _firestore.collection('orders').get();
     final usersFuture = _firestore.collection('users').get();
 
     final historySnapshot = await historyFuture;
@@ -71,7 +69,7 @@ class DashboardService {
   }
 
   Future<List<RevenueChartModel>> getRevenueChart() async {
-    final snapshot = await _firestore.collection("order_history").get();
+    final snapshot = await _firestore.collection("orders").get();
 
     final Map<int, double> monthlyRevenue = {};
 
@@ -103,7 +101,7 @@ class DashboardService {
   }
 
   Future<List<OrderChartModel>> getOrderChart() async {
-    final snapshot = await _firestore.collection("order_history").get();
+    final snapshot = await _firestore.collection("orders").get();
 
     final Map<int, int> monthlyOrders = {};
 
@@ -131,17 +129,14 @@ class DashboardService {
     final usersFuture = _firestore.collection('users').get();
 
     final ordersFuture = _firestore
-        .collection('order_history')
+        .collection('orders')
         .orderBy('created_at', descending: true)
         .limit(10)
         .get();
 
     final results = await Future.wait([usersFuture, ordersFuture]);
-
     final userSnapshot = results[0];
-
     final orderSnapshot = results[1];
-
     // Cache user
     final Map<String, String> userNames = {};
 
@@ -155,38 +150,25 @@ class DashboardService {
 
     for (final doc in orderSnapshot.docs) {
       final data = doc.data();
-
       final userId = data['user_id'] ?? '';
-
       final driverId = data['driver_id'] ?? '';
 
       orders.add(
         AdminLatestOrder(
           id: doc.id,
-
           orderId: data['order_id'] ?? '',
-
           userId: userId,
-
           driverId: driverId,
-
           userName: userNames[userId] ?? '-',
-
           driverName: userNames[driverId] ?? '-',
-
           address: data['address'] ?? '',
-
           weight: (data['weight'] ?? 0).toDouble(),
-
           price: ((data['price_paid'] ?? data['price'] ?? 0) as num).toDouble(),
-
           status: data['status'] ?? '',
-
           createdAt: data['created_at'] ?? Timestamp.now(),
         ),
       );
     }
-
     return orders;
   }
 
@@ -211,34 +193,27 @@ class DashboardService {
   }
 
   Future<List<TopDriverModel>> getTopDrivers() async {
-    final historySnapshot = await _firestore.collection("order_history").get();
-
+    final historySnapshot = await _firestore.collection("orders").get();
     final Map<String, int> counter = {};
 
     for (final doc in historySnapshot.docs) {
       final data = doc.data();
-
       final driverId = data["driver_id"];
-
       if (driverId == null || driverId.toString().isEmpty) {
         continue;
       }
-
       counter.update(driverId, (value) => value + 1, ifAbsent: () => 1);
     }
 
     final sorted = counter.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-
     final topFive = sorted.take(5).toList();
 
     List<TopDriverModel> drivers = [];
 
     for (final item in topFive) {
       final userDoc = await _firestore.collection("users").doc(item.key).get();
-
       if (!userDoc.exists) continue;
-
       final user = userDoc.data()!;
 
       drivers.add(
@@ -252,7 +227,6 @@ class DashboardService {
         ),
       );
     }
-
     return drivers;
   }
 

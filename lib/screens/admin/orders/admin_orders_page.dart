@@ -71,7 +71,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
 
     try {
       Query query = _firestore
-          .collection('order_history')
+          .collection('orders')
           .orderBy('created_at', descending: true);
 
       // Jika filter bukan 'all', terapkan filter status ke Firestore query
@@ -218,7 +218,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                   }
                   // EXEKUSI UPDATE KE FIRESTORE
                   await _firestore
-                      .collection('order_history')
+                      .collection('orders')
                       .doc(docId)
                       .update(updateData);
 
@@ -271,10 +271,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
               onPressed: () async {
                 Navigator.pop(dialogContext);
                 try {
-                  await _firestore
-                      .collection('order_history')
-                      .doc(docId)
-                      .delete();
+                  await _firestore.collection('orders').doc(docId).delete();
 
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(

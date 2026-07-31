@@ -6,7 +6,7 @@ class OrderService {
 
   Future<OrderDetailModel> getOrderDetail(String documentId) async {
     final orderDoc = await _firestore
-        .collection("order_history")
+        .collection("orders")
         .doc(documentId)
         .get();
 
