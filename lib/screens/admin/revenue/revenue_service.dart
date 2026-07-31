@@ -16,7 +16,7 @@ class RevenueService {
     );
 
     final snap = await _firestore
-        .collection('order_history')
+        .collection('orders')
         .where('status', isEqualTo: 'completed')
         .where('created_at', isGreaterThanOrEqualTo: startTimestamp)
         .where('created_at', isLessThanOrEqualTo: endTimestamp)
