@@ -16,6 +16,18 @@ import '../order_history_widget.dart';
 import '../map_selection_screen.dart';
 import 'package:flutter/services.dart';
 
+/// Fungsi: Dasbor/Halaman Utama untuk Pengguna (User Home Screen).
+/// Cara Kerja:
+/// 1. Mengelola navigasi tab utama via `BottomNavigationBar` (Beranda, Riwayat, Profil).
+/// 2. Memfasilitasi alur pembuatan pesanan penjemputan baru (`_startCreateOrderFlow`) yang terhubung dengan `MapSelectionScreen` dan perhitungan tarif otomatis berbasis jarak & berat.
+/// 3. Menyediakan Floating Action Button (FAB) dinamis (`_buildDynamicFab`) yang memantau transaksi aktif pengguna secara real-time dari Firestore.
+/// 4. Merespon perubahan status pesanan dengan mengarahkan layar ke `OrderRoomScreen` atau mengirimkan notifikasi lokal via `handleStatusChange`.
+///
+/// Operasi CRUD (Create & Read):
+/// - Create (via OrderService): Membuat dokumen transaksi penjemputan baru di Firestore koleksi `orders`.
+///   - Sintaks: `_orderService.createOrder(...)` -> `FirebaseFirestore.instance.collection('orders').doc(orderId).set(...)`
+/// - Read (Realtime Stream): Berlangganan dokumen pesanan aktif pengguna untuk mengontrol tombol tindakan cepat di UI.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').where('user_id', isEqualTo: uid).where('archived', isEqualTo: false).where('status', whereIn: activeStatuses).limit(1).snapshots()`
 class UserHome extends StatefulWidget {
   const UserHome({super.key});
 
@@ -36,7 +48,6 @@ class _UserHomeState extends State<UserHome> {
   final double _pricePerKg = 1000;
 
   // Default base location (Monas, Jakarta) for distance calculation.
-  // If your project already has another util, we can swap later.
   final LatLng _monasLocation = const LatLng(-6.1754, 106.8272);
 
   @override
@@ -45,6 +56,7 @@ class _UserHomeState extends State<UserHome> {
     _orderService = OrderService();
   }
 
+  /// Fungsi: Menghitung jarak linier (Haversine Formula) antara titik awal acuan dan lokasi pilihan pengguna dalam kilometer.
   double _calculateDistance(LatLng a, LatLng b) {
     // Haversine formula
     const earthRadiusKm = 6371.0;
@@ -63,6 +75,7 @@ class _UserHomeState extends State<UserHome> {
     return earthRadiusKm * c;
   }
 
+  /// Fungsi: Merespon perubahan status pesanan dan memicu navigasi atau notifikasi sistem sesuai keadaan pesanan.
   Future<void> handleStatusChange(
     String orderId,
     String status,
@@ -149,6 +162,9 @@ class _UserHomeState extends State<UserHome> {
     }
   }
 
+  /// Fungsi: Memulai alur pembuatan pesanan baru (Pilih lokasi peta -> Form Isian -> Simpan ke Firestore).
+  /// Operasi CRUD (Create):
+  /// - Sintaks Backend: `_orderService.createOrder(...)` menyimpan dokumen baru ke sub-koleksi / koleksi `orders`.
   Future<void> _startCreateOrderFlow() async {
     final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(builder: (_) => const MapSelectionScreen()),
@@ -415,6 +431,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
+  /// Widget Builder: Membangun daftar menu kartu layanan pada Tab Beranda.
   Widget _buildBeranda() {
     final List<Widget> children = [
       Text(
@@ -476,6 +493,9 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
+  /// Widget Builder: Membangun Floating Action Button (FAB) adaptif berbasis status pesanan di Firestore.
+  /// Operasi CRUD (Read - Stream):
+  /// - Sintaks: `FirebaseFirestore.instance.collection('orders').where(...).snapshots()`
   Widget _buildDynamicFab() {
     final auth = Provider.of<AuthService>(context, listen: false);
     final uid = auth.currentUser?.uid;
@@ -579,6 +599,7 @@ class _UserHomeState extends State<UserHome> {
     );
   }
 
+  /// Widget Builder: Membangun tampilan Tab Riwayat Penjemputan dengan merender `OrderHistoryWidget`.
   Widget _buildRiwayat() {
     final auth = Provider.of<AuthService>(context, listen: false);
     final currentUserId = auth.currentUser?.uid ?? '';
@@ -589,6 +610,7 @@ class _UserHomeState extends State<UserHome> {
   }
 }
 
+/// Widget Component: Kartu menu individual pada dasbor utama.
 class _MenuCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -669,6 +691,7 @@ class _MenuCard extends StatelessWidget {
   }
 }
 
+/// Widget Component: Kartu informasi ringkas pesanan yang sedang berlangsung (Active Order).
 class ActiveOrderCard extends StatelessWidget {
   final Map<String, dynamic> orderData;
   final String orderId;
@@ -822,6 +845,7 @@ class ActiveOrderCard extends StatelessWidget {
   }
 }
 
+/// Class Model Data: Mewakili titik data latitude dan longitude sederhana.
 class LatLng {
   final double latitude;
   final double longitude;

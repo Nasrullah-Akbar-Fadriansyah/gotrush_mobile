@@ -3,6 +3,35 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/admin_formatter.dart';
 import 'order_detail_page.dart';
 
+/// Fungsi: Halaman Utama Pengelolaan & Manajemen Pesanan Transaksi Admin (Admin Orders Page).
+/// Cara Kerja:
+/// 1. Mengambil data pesanan dari Firestore secara bertahap menggunakan teknik paginasi lazily-loaded berbasis kursor (`startAfterDocument`).
+/// 2. Mendukung penyaringan data (*filtering*) berdasarkan status pesanan (`pending`, `active`, `completed`, `cancelled`, atau `all`) via Dropdown di AppBar.
+/// 3. Menyediakan dialog form untuk memperbarui data pesanan (*Update Order*) seperti status, alamat, berat, dan total harga.
+/// 4. Memfasilitasi penghapusan dokumen transaksi pesanan (*Delete Order*) dari Firestore dengan konfirmasi dialog modal.
+/// 5. Mengimplementasikan fitur *Pull-to-Refresh* untuk memperbarui ulang daftar pesanan dari kursor paling awal.
+///
+/// Operasi CRUD (Read, Update, & Delete):
+/// - Read (Paginasi Query Document):
+///   - Mengambil 10 dokumen pesanan terbaru dan melanjutkannya berbasis kursor dokumen terakhir.
+///   - Sintaks:
+///     ```dart
+///     Query query = _firestore.collection('orders').orderBy('created_at', descending: true);
+///     if (_selectedFilter != 'all') {
+///       query = query.where('status', isEqualTo: _selectedFilter);
+///     }
+///     if (_lastDocument != null) {
+///       query = query.startAfterDocument(_lastDocument!);
+///     }
+///     query = query.limit(_documentLimit);
+///     final querySnapshot = await query.get();
+///     ```
+/// - Update Document:
+///   - Memperbarui data alamat, berat, harga, status, dan timestamp penyelesaian pesanan.
+///   - Sintaks: `_firestore.collection('orders').doc(docId).update(updateData)`
+/// - Delete Document:
+///   - Menghapus dokumen transaksi pesanan secara permanen dari Firestore.
+///   - Sintaks: `_firestore.collection('orders').doc(docId).delete()`
 class AdminOrdersPage extends StatefulWidget {
   const AdminOrdersPage({super.key});
 
@@ -52,7 +81,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     super.dispose();
   }
 
-  // Fungsi untuk membersihkan state lama dan memuat ulang data saat filter diubah atau di-refresh
+  /// Fungsi: Membersihkan state daftar lokal dan mengulang pemuatan data dari kursor awal (Refresh Data).
   Future<void> _refreshData() async {
     if (!mounted) return;
     setState(() {
@@ -63,7 +92,9 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     await _fetchOrders();
   }
 
-  // [READ PROCESS - PAGINATION] Mengambil data order secara efisien
+  /// Fungsi: Mengambil dokumen transaksi pesanan dari Firestore menggunakan paginasi kursor.
+  /// Operasi CRUD (Read Pagination Query):
+  /// - Sintaks: `_firestore.collection('orders').orderBy('created_at', descending: true).startAfterDocument(_lastDocument!).limit(_documentLimit).get()`
   Future<void> _fetchOrders() async {
     if (_isLoading || !_hasMore) return;
 
@@ -111,7 +142,10 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     }
   }
 
-  // [UPDATE PROCESS] Dialog Form untuk Mengubah Data Order
+  /// Fungsi: Menampilkan Modal Dialog Form untuk menyunting rincian data pesanan.
+  /// Operasi CRUD (Update Document):
+  /// - Memperbarui field alamat, berat, harga, status, dan timestamp completed_at (jika status completed).
+  /// - Sintaks: `_firestore.collection('orders').doc(docId).update(updateData)`
   void _showEditOrderDialog(String docId, Map<String, dynamic> data) {
     final addressController = TextEditingController(
       text: data['address'] ?? '',
@@ -216,7 +250,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                   if (selectedStatus == 'completed') {
                     updateData['completed_at'] = FieldValue.serverTimestamp();
                   }
-                  // EXEKUSI UPDATE KE FIRESTORE
+
                   await _firestore
                       .collection('orders')
                       .doc(docId)
@@ -228,7 +262,6 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                     const SnackBar(content: Text('Order berhasil diperbarui!')),
                   );
 
-                  // Langsung memicu refresh otomatis pada halaman list yang sama
                   _refreshData();
                 } catch (e) {
                   if (!mounted) return;
@@ -249,7 +282,10 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     );
   }
 
-  // [DELETE PROCESS] Konfirmasi & Eksekusi Hapus Order
+  /// Fungsi: Menampilkan Dialog Konfirmasi dan Eksekusi Penghapusan Pesanan.
+  /// Operasi CRUD (Delete Document):
+  /// - Menghapus dokumen pesanan dari koleksi `orders` berdasarkan Document ID.
+  /// - Sintaks: `_firestore.collection('orders').doc(docId).delete()`
   void _showDeleteOrderConfirmation(String docId, String orderId) {
     showDialog(
       context: context,
@@ -295,6 +331,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     );
   }
 
+  /// Helper: Mengembalikan warna indikator visual berdasarkan status pesanan.
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
@@ -310,6 +347,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
     }
   }
 
+  /// Helper Builder: Membangun komponen chip badge status pesanan.
   Widget _buildStatusChip(String status) {
     String label = status;
     switch (status.toLowerCase()) {
@@ -359,7 +397,6 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
         backgroundColor: Colors.green.shade600,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          // Filter kecil (Dropdown) di bagian kanan AppBar
           Theme(
             data: Theme.of(
               context,
@@ -384,7 +421,7 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                   setState(() {
                     _selectedFilter = newValue;
                   });
-                  _refreshData(); // Jalankan ulang query saat filter dipilih
+                  _refreshData();
                 }
               },
             ),

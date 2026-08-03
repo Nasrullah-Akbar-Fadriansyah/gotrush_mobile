@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+/// Fungsi: Widget Wadah Kartu Informasi Generik (Reusable Information Container Card).
+/// Cara Kerja:
+/// 1. Menerima judul header (`title`), ikon identitas (`icon`), serta konten widget anak (`child`).
+/// 2. Membungkus konten anak ke dalam struktur `Card` bersudut tumpul yang konsisten di seluruh panel admin.
+/// 3. Menyediakan header terstandarisasi yang dipisahkan oleh garis pembatas vertikal/horisontal (`Divider`).
+///
+/// Operasi Data & Presentasi:
+/// - Menyediakan abstraksi UI terpusat untuk widget rincian seperti `UserInfoCard`, `DriverInfoCard`, `OrderInfoCard`, dan `TimelineCard`.
 class InfoCard extends StatelessWidget {
   final String title;
   final IconData icon;

@@ -3,6 +3,28 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+/// Fungsi: Halaman Kelola Data Pengguna (User & Driver Management Page).
+/// Cara Kerja:
+/// 1. Menerima `roleFilter` ('user' atau 'driver') untuk menyaring daftar akun yang ditampilkan via `StreamBuilder`.
+/// 2. Menyediakan fitur **Create**: Menambah pengguna/driver baru menggunakan instance Firebase App sekunder (`tempRegisterApp`) agar admin yang sedang login tidak ter-logout saat memanggil `createUserWithEmailAndPassword`.
+/// 3. Menyediakan fitur **Read**: Memantau daftar pengguna secara realtime dengan `snapshots()`.
+/// 4. Menyediakan fitur **Update**: Mengubah nama dan nomor telepon pengguna melalui modal dialog form.
+/// 5. Menyediakan fitur **Delete**: Menghapus dokumen akun pengguna dari Firestore dengan konfirmasi dialog modal.
+///
+/// Operasi CRUD (Create, Read Stream, Update, & Delete):
+/// - Create (Firebase Auth & Firestore):
+///   - Mendaftarkan akun di Firebase Auth tanpa mengganggu sesi login admin.
+///   - Sintaks: `FirebaseAuth.instanceFor(app: tempApp).createUserWithEmailAndPassword(email: email, password: password)`
+///   - Menyimpan dokumen pengguna di Firestore: `_firestore.collection('users').doc(cred.user!.uid).set({...})`
+/// - Read Stream:
+///   - Mendengarkan perubahan data pengguna sesuai role secara realtime.
+///   - Sintaks: `_firestore.collection('users').where('role', isEqualTo: widget.roleFilter).snapshots()`
+/// - Update Document:
+///   - Memperbarui nama dan nomor telepon pengguna.
+///   - Sintaks: `_firestore.collection('users').doc(docId).update({'name': name, 'phone': phone})`
+/// - Delete Document:
+///   - Menghapus profil pengguna dari Firestore.
+///   - Sintaks: `_firestore.collection('users').doc(docId).delete()`
 class AdminUsersManagementPage extends StatefulWidget {
   final String roleFilter; // 'user' atau 'driver'
 
@@ -16,7 +38,10 @@ class AdminUsersManagementPage extends StatefulWidget {
 class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // [CREATE & UPDATE PROCESS] Dialog Form Gabungan
+  /// Fungsi: Menampilkan Dialog Form Gabungan untuk Tambah Baru (Create) atau Edit (Update) Pengguna.
+  /// Operasi CRUD (Create / Update):
+  /// - Create: Mendaftarkan akun ke Firebase Auth via `tempRegisterApp` lalu menyimpan dokumen ke Firestore dengan `.set()`.
+  /// - Update: Memperbarui data pengguna di Firestore via `.update()`.
   void _showFormDialog({
     String? docId,
     String? currentName,
@@ -204,8 +229,7 @@ class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
                               'name': name,
                               'phone': phone,
                               'email': email,
-                              'role':
-                                  widget.roleFilter, // Otomatis sesuai halaman
+                              'role': widget.roleFilter,
                               'status': widget.roleFilter == 'driver'
                                   ? 'offline'
                                   : 'active',
@@ -235,7 +259,9 @@ class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
     );
   }
 
-  // fungsi hapus data user/driver
+  /// Fungsi: Menampilkan Modal Dialog Konfirmasi dan Menghapus Dokumen Pengguna.
+  /// Operasi CRUD (Delete Document):
+  /// - Sintaks: `_firestore.collection('users').doc(docId).delete()`
   void _showDeleteConfirmation(String docId, String name) {
     showDialog(
       context: context,
@@ -272,6 +298,7 @@ class _AdminUsersManagementPageState extends State<AdminUsersManagementPage> {
     );
   }
 
+  /// Helper: Menampilkan pesan info singkat via `SnackBar`.
   void _showSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(

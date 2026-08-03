@@ -1,9 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/order_detail_model.dart';
 
+/// Fungsi: Layanan Pengolah Data Pesanan Admin (Order Service).
+/// Cara Kerja:
+/// 1. Mengambil dokumen tunggal dari koleksi `orders` berdasarkan ID Dokumen.
+/// 2. Menjelajahi dokumen relasional pelanggan (`user_id`) dan driver (`driver_id`) pada koleksi `users`.
+/// 3. Menggunakan `Future.wait` untuk menjalankan fetching paralel data akun pemesan dan driver guna mengoptimalkan kecepatan respons.
+/// 4. Mengisikan data teresolusi ke dalam objek `OrderDetailModel` yang aman terhadap nilai `null` (*null-safe*).
+///
+/// Operasi CRUD (Read Relational Document):
+/// - Membaca dokumen pesanan: `_firestore.collection("orders").doc(documentId).get()`
+/// - Membaca dokumen relasi pengguna/driver secara paralel:
+///   `_firestore.collection("users").doc(userId).get()` & `_firestore.collection("users").doc(driverId).get()`
 class OrderService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// Fungsi: Mengambil dan meresolusi data rincian dokumen pesanan beserta entitas akun pengguna dan driver terkait.
+  /// Operasi CRUD (Read Parallel Documents):
+  /// - Sintaks: `_firestore.collection("orders").doc(documentId).get()`
+  /// - Sintaks Paralel Users: `Future.wait([_firestore.collection("users").doc(userId).get(), _firestore.collection("users").doc(driverId).get()])`
   Future<OrderDetailModel> getOrderDetail(String documentId) async {
     final orderDoc = await _firestore
         .collection("orders")

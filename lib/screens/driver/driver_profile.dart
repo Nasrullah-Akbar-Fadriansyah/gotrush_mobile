@@ -5,6 +5,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../utils/alerts.dart';
 
+/// Fungsi: Halaman Pengelolaan Profil dan Keamanan Akun Driver (Driver Profile Screen).
+/// Cara Kerja:
+/// 1. Mengambil data nama dan nomor telepon driver dari Firebase Auth dan dokumen koleksi `users`.
+/// 2. Memperbarui informasi profil driver ke Firebase Auth (`updateDisplayName`) dan Firestore.
+/// 3. Mengatur proses ubah kata sandi melalui prosedur re-autentikasi akun berdasar email/password.
+///
+/// Operasi CRUD (Read & Update):
+/// - Read Document: Membaca dokumen detail profil driver di Firestore.
+///   - Sintaks: `FirebaseFirestore.instance.collection('users').doc(user.uid).get()`
+/// - Update Document & Auth: Memperbarui nama dan nomor telepon driver.
+///   - Sintaks Auth: `user.updateDisplayName(name)`
+///   - Sintaks Firestore: `FirebaseFirestore.instance.collection('users').doc(user.uid).update({'name': ..., 'phone': ...})`
+/// - Update Password: Re-autentikasi dan ganti kata sandi driver.
+///   - Sintaks Auth: `user.reauthenticateWithCredential(...)` diikuti `user.updatePassword(...)`
 class DriverProfile extends StatefulWidget {
   const DriverProfile({super.key});
   @override
@@ -41,6 +55,9 @@ class _DriverProfileState extends State<DriverProfile> {
     super.dispose();
   }
 
+  /// Fungsi: Memuat profil driver dari Firebase Authentication & Firestore.
+  /// Operasi CRUD (Read Document):
+  /// - Sintaks: `FirebaseFirestore.instance.collection('users').doc(user.uid).get()`
   Future<void> _loadDriverData() async {
     setState(() => _isLoading = true);
     try {
@@ -72,6 +89,7 @@ class _DriverProfileState extends State<DriverProfile> {
     }
   }
 
+  /// Fungsi Helper: Menampilkan Dialog konfirmasi pembaruan data.
   Future<bool> _showConfirmationDialog({
     required String title,
     required String message,
@@ -112,6 +130,10 @@ class _DriverProfileState extends State<DriverProfile> {
     return result ?? false;
   }
 
+  /// Fungsi: Memperbarui nama dan nomor telepon driver.
+  /// Operasi CRUD (Update Document & Auth):
+  /// - Sintaks Auth: `user.updateDisplayName(...)`
+  /// - Sintaks Firestore: `FirebaseFirestore.instance.collection('users').doc(user.uid).update(...)`
   Future<void> _updateProfile() async {
     if (_isUpdatingProfile) return;
     if (!_formKey.currentState!.validate()) return;
@@ -144,6 +166,9 @@ class _DriverProfileState extends State<DriverProfile> {
     }
   }
 
+  /// Fungsi: Mengubah kata sandi akun driver.
+  /// Operasi CRUD (Update Password Auth):
+  /// - Sintaks: `user.reauthenticateWithCredential(...)` & `user.updatePassword(...)`
   Future<void> _updatePassword() async {
     if (_isUpdatingPassword) return;
     if (_isGoogleUser) return;

@@ -3,6 +3,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'order_detail_screen.dart';
 
+/// Fungsi: Widget komponen riwayat pesanan (Order History List) dengan fitur Pagination (Infinite Scroll) dan Soft Delete.
+/// Cara Kerja:
+/// 1. Mengambil data riwayat berstatus 'completed' dari Firestore sebanyak 20 item per halaman (`_pageSize = 20`).
+/// 2. Mengaitkan `ScrollController` untuk mendeteksi posisi batas bawah layar untuk memicu pemanggilan halaman berikutnya (`_fetchMore`).
+/// 3. Menyediakan fungsi penyembunyian riwayat (soft delete) sehingga pesanan disembunyikan dari salah satu pihak tanpa menghapus dokumen utama di database.
+///
+/// Operasi CRUD (Read & Update):
+/// - Read 1 (Paginated Query): Mengambil halaman awal riwayat dengan memfilter role dan menyaring pesanan tersembunyi.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').where('user_id', isEqualTo: uid).where('status', isEqualTo: 'completed').where('hidden_by_user', isEqualTo: false).orderBy('completed_at', descending: true).limit(20).get()`
+/// - Read 2 (Cursor Pagination): Mengambil data tambahan berlanjut dari dokumen terakhir.
+///   - Sintaks: `query.startAfterDocument(_lastDoc!).limit(20).get()`
+/// - Update (Soft Delete): Memperbarui atribut `hidden_by_user` atau `hidden_by_driver` menjadi `true`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(orderId).update({'hidden_by_user': true})`
 class OrderHistoryWidget extends StatefulWidget {
   final String currentUserId;
   final String role;
@@ -70,6 +83,9 @@ class _OrderHistoryWidgetState extends State<OrderHistoryWidget> {
     return DateFormat('d MMM yyyy • HH:mm').format(ts.toDate());
   }
 
+  /// Fungsi: Membangun query Firestore dasar untuk mengambil riwayat berdasarkan peran akun.
+  /// Operasi CRUD (Read Query Builder):
+  /// - Sintaks: `.collection('orders').where(...).where('status', isEqualTo: 'completed').orderBy('completed_at', descending: true)`
   Query _buildQuery() {
     final hiddenField = widget.role == 'user'
         ? 'hidden_by_user'
@@ -86,6 +102,9 @@ class _OrderHistoryWidgetState extends State<OrderHistoryWidget> {
         .orderBy('completed_at', descending: true);
   }
 
+  /// Fungsi: Mengambil data halaman pertama (20 dokumen awal).
+  /// Operasi CRUD (Read):
+  /// - Sintaks: `_buildQuery().limit(_pageSize).get()`
   Future<void> _fetchInitial() async {
     setState(() {
       _initialLoading = true;
@@ -107,6 +126,9 @@ class _OrderHistoryWidgetState extends State<OrderHistoryWidget> {
     }
   }
 
+  /// Fungsi: Mengambil data halaman berikutnya dari Firestore menggunakan cursor kursor dokumen terakhir (`startAfterDocument`).
+  /// Operasi CRUD (Read - Cursor Pagination):
+  /// - Sintaks: `_buildQuery().startAfterDocument(_lastDoc!).limit(_pageSize).get()`
   Future<void> _fetchMore() async {
     if (_loadingMore || !_hasMore || _lastDoc == null) return;
     setState(() => _loadingMore = true);
@@ -135,9 +157,9 @@ class _OrderHistoryWidgetState extends State<OrderHistoryWidget> {
     _fetchInitial();
   }
 
+  /// Listener Scroll: Mendeteksi jika posisi scroll sudah mendekati batas bawah (jarak 200 piksel dari bawah).
   void _onScroll() {
     if (!_hasMore || _loadingMore) return;
-    // Trigger when near bottom (within ~200px)
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _fetchMore();
@@ -151,6 +173,14 @@ class _OrderHistoryWidgetState extends State<OrderHistoryWidget> {
     super.dispose();
   }
 
+  /// Fungsi: Menyembunyikan tampilan pesanan dari riwayat pengguna (Soft Delete).
+  /// Cara Kerja:
+  /// 1. Memunculkan dialog konfirmasi hapus riwayat.
+  /// 2. Mengubah nilai atribut `hidden_by_user` atau `hidden_by_driver` di Firestore menjadi `true`.
+  /// 3. Menghapus item secara lokal dari daftar `_docs` agar tampilan langsung terbarui.
+  ///
+  /// Operasi CRUD (Update):
+  /// - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(orderId).update({fieldToUpdate: true})`
   Future<void> _deleteOrder(BuildContext context, String orderId) async {
     final ok = await showDialog<bool>(
       context: context,

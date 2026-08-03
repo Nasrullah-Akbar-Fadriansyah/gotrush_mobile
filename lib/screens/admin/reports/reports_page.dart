@@ -2,6 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/admin_formatter.dart';
 
+/// Fungsi: Halaman Laporan Analitik Operasional & Finansial (Reports Page).
+/// Cara Kerja:
+/// 1. Mengizinkan admin memilih rentang tanggal awal (`_startDate`) dan tanggal akhir (`_endDate`) melalui `showDateRangePicker`.
+/// 2. Melakukan query ke koleksi `orders` untuk mengambil transaksi dalam rentang tanggal tersebut.
+/// 3. Melakukan agregasi lokal: menghitung total order, pesanan berhasil, pesanan dibatalkan, akumulasi pendapatan bersih, dan total berat sampah terangkut.
+/// 4. Menyajikan ringkasan dalam bentuk kartu statistik terstruktur serta menyediakan tombol simulasi ekspor laporan.
+///
+/// Operasi CRUD (Read & Filtering Query):
+/// - Membaca dokumen pesanan berdasarkan kriteria timestamps `created_at`.
+/// - Sintaks:
+///   ```dart
+///   _firestore
+///       .collection('orders')
+///       .where('created_at', isGreaterThanOrEqualTo: startTimestamp)
+///       .where('created_at', isLessThanOrEqualTo: endTimestamp)
+///       .get();
+///   ```
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
 
@@ -30,6 +47,9 @@ class _ReportsPageState extends State<ReportsPage> {
     _generateReport();
   }
 
+  /// Fungsi: Mengambil data transaksi dari Firestore dalam rentang rentang waktu tertentu dan mengagregasi hasilnya secara lokal.
+  /// Operasi CRUD (Read Query):
+  /// - Sintaks: `_firestore.collection('orders').where('created_at', isGreaterThanOrEqualTo: startTimestamp).where('created_at', isLessThanOrEqualTo: endTimestamp).get()`
   Future<void> _generateReport() async {
     setState(() {
       _isLoading = true;
@@ -98,6 +118,7 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
+  /// Fungsi: Menampilkan dialog pemilih rentang tanggal (*Date Range Picker*) untuk menyaring periode laporan.
   Future<void> _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -328,6 +349,7 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
+  /// Helper Builder: Membangun kartu item ringkasan dengan ikon berwarna dan teks nilai data.
   Widget _buildReportItem({
     required String title,
     required String value,

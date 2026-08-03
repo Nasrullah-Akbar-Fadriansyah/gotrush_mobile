@@ -7,14 +7,37 @@ import 'dashboard_data.dart';
 import '../models/top_driver_model.dart';
 import '../models/top_user_model.dart';
 
+/// Fungsi: Layanan Utama Pengolah & Agregasi Data Dashboard Admin (Dashboard Service).
+/// Cara Kerja:
+/// 1. Berhubungan langsung dengan database Cloud Firestore untuk mengambil koleksi `orders` dan `users`.
+/// 2. Melakukan pengolahan asinkron untuk kalkulasi agregasi: total finansial, rekapitulator berat sampah, distribusi peran pengguna, dan pembuatan deret waktu bulanan (grafik).
+/// 3. Mengombinasikan query paralel menggunakan `Future.wait` guna meningkatkan performa pemuatan data dashboard.
+///
+/// Operasi CRUD (Read Operations):
+/// - Stream Realtime:
+///   - Mendengarkan event perubahan pada seluruh dokumen di koleksi `orders`.
+///     - Sintaks: `_firestore.collection('orders').snapshots()`
+/// - Read Collections (Get Once):
+///   - Mengambil seluruh data pesanan: `_firestore.collection('orders').get()`
+///   - Mengambil seluruh data pengguna: `_firestore.collection('users').get()`
+///   - Filter & Limit Pesanan Terbaru: `_firestore.collection('orders').orderBy('created_at', descending: true).limit(10).get()`
+///   - Membaca dokumen spesifik pengguna: `_firestore.collection('users').doc(uid).get()`
 class DashboardService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  /// Fungsi: Membuka aliran data (Stream) realtime yang terhubung ke koleksi `orders` di Firestore.
+  /// Setiap kali ada perubahan transaksi di database, aliran akan memanggil ulang `loadDashboard()`.
+  /// Operasi CRUD (Read Stream):
+  /// - Sintaks: `_firestore.collection('orders').snapshots()`
   Stream<DashboardData> streamDashboard() {
     return _firestore.collection('orders').snapshots().asyncMap((_) async {
       return await loadDashboard();
     });
   }
 
+  /// Fungsi: Menghitung metrik ringkasan umum statistik sistem (Statistik Pemasukan, Berat Sampah, Jumlah Transaksi, serta Sebaran Pengguna/Driver).
+  /// Operasi CRUD (Read Documents):
+  /// - Sintaks: `_firestore.collection('orders').get()` & `_firestore.collection('users').get()`
   Future<DashboardStats> getDashboardStats() async {
     final historyFuture = _firestore.collection('orders').get();
     final usersFuture = _firestore.collection('users').get();
@@ -28,23 +51,23 @@ class DashboardService {
     int totalUsers = 0;
     int totalDrivers = 0;
 
-    // ORDER HISTORY
+    // KETENTUAN AKUMULASI ORDER:
     for (final doc in historySnapshot.docs) {
       final data = doc.data();
       final status = data['status'] ?? '';
 
-      // Pendapatan bersih hanya dihitung jika status order selesai/completed
+      // Pendapatan bersih & berat hanya dihitung jika status order selesai/completed
       if (status == 'completed') {
         totalRevenue += ((data['price_paid'] ?? data['price'] ?? 0) as num)
             .toDouble();
         totalWeight += ((data['weight'] ?? 0) as num).toDouble();
       }
 
-      // Setiap ada dokumen order (baik pending, aktif, selesai, batal) jumlah total bertambah
+      // Setiap dokumen order dihitung ke dalam total transaksi keseluruhan
       totalOrdersCount++;
     }
 
-    // USERS
+    // KETENTUAN PERHITUNGAN ROLE USER:
     for (final doc in usersSnapshot.docs) {
       final role = doc.data()['role'];
 
@@ -60,14 +83,16 @@ class DashboardService {
 
     return DashboardStats(
       totalRevenue: totalRevenue,
-      totalCompletedOrders:
-          totalOrdersCount, // Menyuplai total keseluruhan ke model stats Anda
+      totalCompletedOrders: totalOrdersCount,
       totalWeight: totalWeight,
       totalUsers: totalUsers,
       totalDrivers: totalDrivers,
     );
   }
 
+  /// Fungsi: Memetakan akumulasi total pendapatan berdasarkan bulan (Januari - Desember) untuk grafik pendapatan.
+  /// Operasi CRUD (Read Documents):
+  /// - Sintaks: `_firestore.collection('orders').get()`
   Future<List<RevenueChartModel>> getRevenueChart() async {
     final snapshot = await _firestore.collection("orders").get();
 
@@ -100,6 +125,9 @@ class DashboardService {
     return result;
   }
 
+  /// Fungsi: Menghitung frekuensi total transaksi order berdasarkan bulan (Januari - Desember) untuk grafik total order.
+  /// Operasi CRUD (Read Documents):
+  /// - Sintaks: `_firestore.collection('orders').get()`
   Future<List<OrderChartModel>> getOrderChart() async {
     final snapshot = await _firestore.collection("orders").get();
 
@@ -125,6 +153,10 @@ class DashboardService {
     return result;
   }
 
+  /// Fungsi: Mengambil 10 transaksi pesanan terbaru dan menggabungkannya dengan data identitas pengguna/driver dari koleksi `users`.
+  /// Operasi CRUD (Read Parallel & Query):
+  /// - Sintaks User Caching: `_firestore.collection('users').get()`
+  /// - Sintaks Order Terbatas: `_firestore.collection('orders').orderBy('created_at', descending: true).limit(10).get()`
   Future<List<AdminLatestOrder>> getLatestOrders() async {
     final usersFuture = _firestore.collection('users').get();
 
@@ -137,12 +169,12 @@ class DashboardService {
     final results = await Future.wait([usersFuture, ordersFuture]);
     final userSnapshot = results[0];
     final orderSnapshot = results[1];
-    // Cache user
+
+    // Caching nama pengguna berbasis Map ID
     final Map<String, String> userNames = {};
 
     for (final doc in userSnapshot.docs) {
       final data = doc.data();
-
       userNames[doc.id] = data['name'] ?? '-';
     }
 
@@ -172,6 +204,7 @@ class DashboardService {
     return orders;
   }
 
+  /// Fungsi: Menjalankan pemuatan seluruh komponen data dashboard secara eksekusi paralel via `Future.wait`.
   Future<DashboardData> loadDashboard() async {
     final results = await Future.wait([
       getDashboardStats(),
@@ -187,11 +220,15 @@ class DashboardService {
       revenueChart: results[1] as List<RevenueChartModel>,
       orderChart: results[2] as List<OrderChartModel>,
       latestOrders: results[3] as List<AdminLatestOrder>,
-      topDrivers: [],
-      topUsers: [],
+      topDrivers: results[4] as List<TopDriverModel>,
+      topUsers: results[5] as List<TopUserModel>,
     );
   }
 
+  /// Fungsi: Mengagregasi data driver teraktif berdasarkan akumulasi penyelesaian pesanan dan mengambil 5 peringkat teratas.
+  /// Operasi CRUD (Read Documents & Dynamic Lookup):
+  /// - Read Order History: `_firestore.collection('orders').get()`
+  /// - Read User Detail: `_firestore.collection('users').doc(uid).get()`
   Future<List<TopDriverModel>> getTopDrivers() async {
     final historySnapshot = await _firestore.collection("orders").get();
     final Map<String, int> counter = {};
@@ -230,6 +267,7 @@ class DashboardService {
     return drivers;
   }
 
+  /// Fungsi: Mengagregasi data pengguna/pelanggan teraktif (Placeholder pengembang untuk modul leaderboard pengguna).
   Future<List<TopUserModel>> getTopUsers() async {
     return [];
   }

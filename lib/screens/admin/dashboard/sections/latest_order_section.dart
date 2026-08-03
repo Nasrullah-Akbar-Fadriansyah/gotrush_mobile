@@ -3,6 +3,14 @@ import '../../models/admin_latest_order.dart';
 import '../../widgets/latest_orders.dart';
 import '../../orders/admin_orders_page.dart';
 
+/// Fungsi: Bagian Komponen Aktivitas Transaksi Terbaru pada Dashboard Admin.
+/// Cara Kerja:
+/// 1. Menerima daftar transaksi pesanan terbaru (`orders`) yang diambil dari Firestore.
+/// 2. Mengecek status ketersediaan data: Jika kosong, merender kartu info kosong (*empty state*); jika ada, memanggil widget presentasi `LatestOrders`.
+/// 3. Menyediakan tombol aksi "Lihat Semua" untuk mengarahkan admin ke halaman kelola seluruh pesanan (`AdminOrdersPage`).
+///
+/// Operasi Data & Presentasi:
+/// - Menerima data daftar model `AdminLatestOrder` dari pengolah data agregat dashboard.
 class LatestOrderSection extends StatelessWidget {
   final List<AdminLatestOrder> orders;
 
@@ -74,7 +82,6 @@ class LatestOrderSection extends StatelessWidget {
             ),
           )
         else
-          // Menggunakan widget global presentasi yang sudah Anda buat sebelumnya
           LatestOrders(orders: orders),
       ],
     );

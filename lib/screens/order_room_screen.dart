@@ -9,6 +9,20 @@ import '../services/order_service.dart';
 import 'chat_screen.dart';
 import 'driver/driver_map_tracking_screen.dart';
 
+/// Fungsi: Ruang Kontrol dan Manajemen Operasional Pesanan Aktif (Order Room Screen).
+/// Cara Kerja:
+/// 1. Berlangganan status perubahan data pesanan secara real-time dari Firestore via `StreamBuilder`.
+/// 2. Menampilkan dynamic UI berdasarkan peranan akun (`user` atau `driver`) serta alur tahapan status pesanan:
+///    - Tahap Penimbangan: Driver memasukkan berat hasil timbangan (`proposeWeight`).
+///    - Tahap Verifikasi: Pengguna menerima atau menyanggah hasil berat (`confirmWeightByUser` / `disputeWeightByUser`).
+///    - Tahap Pembayaran: Pengguna melakukan pembayaran melalui payment gateway Midtrans Snap Webview.
+///    - Tahap Penjemputan & Selesai: Driver mengonfirmasi penjemputan dan menyelesaikan transaksi.
+///
+/// Operasi CRUD (Read & Update):
+/// - Read (Stream): Berlangganan dokumen order tunggal secara real-time.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(orderId).snapshots()`
+/// - Update (via OrderService): Memperbarui atribut status, berat timbangan, dan tahapan verifikasi.
+///   - Sintaks: `doc(orderId).update({'status': ..., 'driver_weight': ...})`
 class OrderRoomScreen extends StatefulWidget {
   final String orderId;
   final String role;
@@ -204,6 +218,10 @@ class _OrderRoomScreenState extends State<OrderRoomScreen> {
     );
   }
 
+  /// Widget Builder: Menampilkan area interaktif khusus alur kerja timbangan, persetujuan harga, pembayaran Midtrans, dan konfirmasi penjemputan.
+  /// Operasi CRUD (Update):
+  /// - Mengirim hasil penimbangan driver: `OrderService().proposeWeight(...)` -> memicu `doc(orderId).update(...)`
+  /// - Merespon validasi berat/penjemputan: `OrderService().confirmWeightByUser(...)` / `userRespondPickupValidation(...)`
   Widget _buildWeighingSection({
     required BuildContext context,
     required String status,

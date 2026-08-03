@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import '../utils/admin_formatter.dart';
 import 'revenue_service.dart';
 
+/// Fungsi: Halaman Tampilan Analisis Keuangan & Pemasukan Admin (Admin Revenue Page).
+/// Cara Kerja:
+/// 1. Memanggil `RevenueService().getRevenueReport(_startDate, _endDate)` untuk mengambil rincian statistik pemasukan.
+/// 2. Menampilkan total pendapatan kotor, jumlah transaksi, rata-rata pendapatan per order, serta *breakdown* berdasarkan status/metode pembayaran.
+/// 3. Menyediakan kustomisasi rentang tanggal analisis via `showDateRangePicker` serta tombol pembaruan data manual.
+///
+/// Operasi Data (Read Financial Summary):
+/// - Memicu metode pembacaan data keuangan dari `RevenueService`.
 class AdminRevenuePage extends StatefulWidget {
   const AdminRevenuePage({super.key});
 
@@ -27,6 +35,7 @@ class _AdminRevenuePageState extends State<AdminRevenuePage> {
     _fetchRevenueData();
   }
 
+  /// Fungsi: Memuat ulang laporan data pemasukan dari layanan `RevenueService`.
   Future<void> _fetchRevenueData() async {
     setState(() => _isLoading = true);
     try {
@@ -48,6 +57,7 @@ class _AdminRevenuePageState extends State<AdminRevenuePage> {
     }
   }
 
+  /// Fungsi: Menampilkan dialog kalender untuk memilih rentang periode analisis pemasukan.
   Future<void> _pickDateRange() async {
     final picked = await showDateRangePicker(
       context: context,
@@ -223,6 +233,7 @@ class _AdminRevenuePageState extends State<AdminRevenuePage> {
     );
   }
 
+  /// Helper Builder: Membangun kartu statistik berukuran kecil untuk metrik tambahan.
   Widget _buildMiniStatCard(
     String title,
     String value,

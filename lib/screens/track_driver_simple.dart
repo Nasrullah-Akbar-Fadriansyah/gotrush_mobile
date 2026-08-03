@@ -5,6 +5,15 @@ import 'package:geolocator/geolocator.dart';
 import '../services/notification_service.dart';
 import '../utils/alerts.dart';
 
+/// Fungsi: Antarmuka sederhana pelacakan posisi driver secara real-time tanpa elemen peta grafik.
+/// Cara Kerja:
+/// 1. Berlangganan data perubahan lokasi Driver dari dokumen `drivers` Firestore (`_sub`).
+/// 2. Menghitung selisih jarak fisik (dalam meter & km) antara posisi pengguna dan driver.
+/// 3. Jika jarak driver mendekati <= 200 meter, otomatis memicu notifikasi lokal melalui `NotificationService().showLocal`.
+///
+/// Operasi CRUD (Read - Stream):
+/// - Berlangganan data posisi driver di Firestore koleksi `drivers`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('drivers').doc(driverId).snapshots().listen(...)`
 class TrackDriverSimple extends StatefulWidget {
   final String driverId;
   final double userLat;
@@ -49,7 +58,7 @@ class _TrackDriverSimpleState extends State<TrackDriverSimple> {
               _driverLng!,
             );
           });
-
+          // Menguji threshold kedekatan jarak untuk memicu notifikasi lokal
           if (_distanceMeters != null &&
               _distanceMeters! <= 200 &&
               !_notified) {

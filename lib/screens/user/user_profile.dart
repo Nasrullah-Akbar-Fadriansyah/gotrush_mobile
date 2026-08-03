@@ -5,6 +5,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../utils/alerts.dart';
 
+/// Fungsi: Halaman Pengelolaan Profil dan Keamanan Akun Pengguna (User Profile Screen).
+/// Cara Kerja:
+/// 1. Saat inisialisasi (`_loadUserData`), memuat data pengguna dari Firebase Auth dan dokumen Firestore koleksi `users`.
+/// 2. Memeriksa penyedia autentikasi akun (Google atau Email/Password) via `user.providerData` untuk menyembunyikan/menampilkan opsi ubah password.
+/// 3. Memperbarui informasi profil (nama & nomor hp) ke Firebase Auth & Firestore.
+/// 4. Memfasilitasi penggantian kata sandi melalui proses re-autentikasi kredensial email/password (`user.reauthenticateWithCredential`).
+///
+/// Operasi CRUD (Read & Update):
+/// - Read Document: Membaca dokumen profil pengguna dari Firestore berdasarkan UID.
+///   - Sintaks: `FirebaseFirestore.instance.collection('users').doc(user.uid).get()`
+/// - Update Profile: Memperbarui data profil di Firestore dan Firebase Auth.
+///   - Sintaks Auth: `user.updateDisplayName(name)`
+///   - Sintaks Firestore: `FirebaseFirestore.instance.collection('users').doc(user.uid).update({'name': ..., 'phone': ...})`
+/// - Update Password Auth: Mengubah kata sandi pengguna di layanan Firebase Authentication.
+///   - Sintaks Auth: `user.reauthenticateWithCredential(...)` diikuti `user.updatePassword(...)`
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});
 
@@ -44,6 +59,9 @@ class _UserProfileState extends State<UserProfile> {
     super.dispose();
   }
 
+  /// Fungsi: Memuat informasi profil pengguna dari Firebase Authentication dan dokumen Firestore.
+  /// Operasi CRUD (Read):
+  /// - Sintaks Backend: `FirebaseFirestore.instance.collection('users').doc(user.uid).get()`
   Future<void> _loadUserData() async {
     setState(() => _isLoading = true);
 
@@ -79,6 +97,7 @@ class _UserProfileState extends State<UserProfile> {
     }
   }
 
+  /// Fungsi: Menampilkan Dialog konfirmasi sebelum mengeksekusi aksi penting (Ubah Profil / Ubah Password).
   Future<bool> _showConfirmationDialog({
     required String title,
     required String message,
@@ -120,6 +139,10 @@ class _UserProfileState extends State<UserProfile> {
     return result ?? false;
   }
 
+  /// Fungsi: Memperbarui data informasi nama lengkap dan nomor telepon pengguna.
+  /// Operasi CRUD (Update):
+  /// - Firebase Auth: `user.updateDisplayName(...)`
+  /// - Firestore: `FirebaseFirestore.instance.collection('users').doc(user.uid).update(...)`
   Future<void> _updateProfile() async {
     if (_isUpdatingProfile) return;
     if (!_formKey.currentState!.validate()) return;
@@ -157,6 +180,10 @@ class _UserProfileState extends State<UserProfile> {
     }
   }
 
+  /// Fungsi: Mengubah kata sandi pengguna dengan re-autentikasi kredensial lama terlebih dahulu.
+  /// Operasi CRUD (Update Auth):
+  /// - Sintaks Re-autentikasi: `user.reauthenticateWithCredential(...)`
+  /// - Sintaks Update Password: `user.updatePassword(...)`
   Future<void> _updatePassword() async {
     if (_isUpdatingPassword) return;
     if (_isGoogleUser) return;

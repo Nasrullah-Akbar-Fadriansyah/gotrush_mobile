@@ -4,6 +4,14 @@ import '../../models/order_detail_model.dart';
 import '../../utils/admin_formatter.dart';
 import '../../widgets/info_card.dart';
 
+/// Fungsi: Kartu Tampilan Jejak Waktu Perjalanan Pesanan (Timeline Order Card Widget).
+/// Cara Kerja:
+/// 1. Menyusun alur peristiwa siklus hidup pesanan secara vertikal (Order Dibuat -> Driver Menerima -> Order Selesai).
+/// 2. Memeriksa keberadaan Timestamp `acceptedAt` dan `completedAt`. Jika nilai bernilai `null`, tahapan ditampilkan dengan status non-aktif (Warna Abu-abu & Teks "Belum diterima / Belum selesai").
+/// 3. Menggunakan `IntrinsicHeight` untuk menggambar garis penghubung antar-titik event timeline secara presisi.
+///
+/// Operasi Data & Presentasi:
+/// - Membaca dan memformat nilai `order.createdAt`, `order.acceptedAt`, dan `order.completedAt`.
 class TimelineCard extends StatelessWidget {
   final OrderDetailModel order;
 
@@ -23,7 +31,6 @@ class TimelineCard extends StatelessWidget {
             time: AdminFormatter.dateTime(order.createdAt.toDate()),
             isLast: false,
           ),
-
           _timelineItem(
             icon: Icons.local_shipping,
             color: order.acceptedAt != null ? Colors.blue : Colors.grey,
@@ -33,7 +40,6 @@ class TimelineCard extends StatelessWidget {
                 : "Belum diterima",
             isLast: false,
           ),
-
           _timelineItem(
             icon: Icons.check_circle,
             color: order.completedAt != null ? Colors.green : Colors.grey,
@@ -48,6 +54,7 @@ class TimelineCard extends StatelessWidget {
     );
   }
 
+  /// Helper Builder: Membangun satu item nodus rantai timeline lengkap dengan garis vertikal konektor.
   Widget _timelineItem({
     required IconData icon,
     required Color color,
@@ -66,16 +73,13 @@ class TimelineCard extends StatelessWidget {
                 backgroundColor: color,
                 child: Icon(icon, color: Colors.white, size: 18),
               ),
-
               if (!isLast)
                 Expanded(
                   child: Container(width: 2, color: Colors.grey.shade300),
                 ),
             ],
           ),
-
           const SizedBox(width: 16),
-
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 20),
@@ -86,9 +90,7 @@ class TimelineCard extends StatelessWidget {
                     title,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 4),
-
                   Text(time, style: const TextStyle(color: Colors.grey)),
                 ],
               ),

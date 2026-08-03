@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+/// Fungsi: Halaman Edukasi Pengelolaan Sampah dan Daur Ulang.
+/// Cara Kerja:
+/// 1. Menampilkan materi edukasi interaktif yang terbagi ke dalam 4 tab utama: Pengantar, Jenis Sampah, Kelebihan & Kekurangan, serta 3R & Tips.
+/// 2. Menggunakan `AnimationController` untuk memberikan efek animasi *fade-in* serta *pulsing icon* pada header.
+/// 3. Menyediakan komponen interaktif berupa `ExpansionTile` untuk daftar jenis sampah dan modal bottom sheet (`_showInfo`) untuk melihat saran tindakan praktis.
+/// 4. Mengelola state lokal (`_sectionIndex`, `_tipsIndex`, `_introExpanded`) untuk mengontrol alur konten tanpa bergantung pada database eksternal.
+///
+/// Operasi CRUD:
+/// - File ini bersifat statis (Client-side UI) dan **tidak melakukan operasi CRUD** ke database/backend Firebase.
 class EdukasiScreen extends StatefulWidget {
   const EdukasiScreen({super.key});
   @override
@@ -188,6 +197,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     super.dispose();
   }
 
+  /// Widget Builder: Membangun bagian header edukasi lengkap dengan ikon beranimasi pulse.
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -231,6 +241,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Widget Builder: Membangun baris pilihan tab modul materi (Pengantar, Jenis, dll).
   Widget _buildSectionTabs() {
     const labels = [
       'Pengantar',
@@ -262,6 +273,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Widget Builder: Memilih tampilan badan layar berdasarkan tab yang aktif.
   Widget _buildSectionBody(int index) {
     switch (index) {
       case 0:
@@ -277,6 +289,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     }
   }
 
+  /// Widget Builder: Konten Tab 0 - Pengantar dasar pengelolaan sampah dan dampaknya.
   Widget _buildIntroSection() {
     final items = [
       {
@@ -363,6 +376,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Widget Builder: Konten Tab 1 - Kategori jenis sampah (Organik, Anorganik, B3, E-Waste, Medis).
   Widget _buildJenisSection() {
     final panels = [
       {
@@ -502,6 +516,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Widget Builder: Konten Tab 2 - Analisis Kelebihan & Kekurangan metode daur ulang.
   Widget _buildProsConsSection() {
     final pros = [
       'Mengurangi volume sampah di TPA dan potensi banjir.',
@@ -641,6 +656,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Widget Builder: Konten Tab 3 - Prinsip 3R (Reduce, Reuse, Recycle) dan Tips Harian.
   Widget _build3RTipsSection() {
     final threeR = [
       {
@@ -742,6 +758,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Helper Builder: Mengurangi duplikasi kode dengan membungkus elemen UI ke dalam animasi kemunculan perlahan (*fade/slide*).
   Widget _animatedCard({required int index, required Widget child}) {
     final delayMs = 60 * index;
     return TweenAnimationBuilder<double>(
@@ -760,6 +777,7 @@ class _EdukasiScreenState extends State<EdukasiScreen>
     );
   }
 
+  /// Fungsi: Menampilkan dialog BottomSheet berisi rekomendasi aksi dari item checklist yang dipilih.
   void _showInfo(String category, String text) {
     final actions = _saranTindakan[category] ?? const [];
     showModalBottomSheet(

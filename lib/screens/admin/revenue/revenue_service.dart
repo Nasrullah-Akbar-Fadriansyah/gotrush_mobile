@@ -1,9 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Fungsi: Layanan Agregasi Data Pemasukan Keuangan (Revenue Service).
+/// Cara Kerja:
+/// 1. Mengambil seluruh dokumen pesanan dari koleksi `orders` yang berstatus `completed` dalam rentang waktu yang ditentukan.
+/// 2. Menghitung total nilai pendapatan (`totalRevenue`) dan total transaksi (`transactionCount`).
+/// 3. Mengelompokkan pendapatan berdasarkan metode/status pembayaran (`paymentMethodBreakdown`).
+/// 4. Menghitung nilai rata-rata transaksi per order (`averagePerOrder`).
+///
+/// Operasi CRUD (Read Query & Agregasi):
+/// - Membaca pesanan selesai dalam periode tertentu.
+/// - Sintaks:
+///   ```dart
+///   _firestore
+///       .collection('orders')
+///       .where('status', isEqualTo: 'completed')
+///       .where('created_at', isGreaterThanOrEqualTo: startTimestamp)
+///       .where('created_at', isLessThanOrEqualTo: endTimestamp)
+///       .get();
+///   ```
 class RevenueService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Mengambil data pendapatan berdasarkan rentang waktu tertentu
+  /// Fungsi: Mengambil dan mengagregasi data laporan pendapatan berdasarkan rentang waktu tertentu.
+  /// Operasi CRUD (Read Operations):
+  /// - Sintaks: `_firestore.collection('orders').where('status', isEqualTo: 'completed').where('created_at', isGreaterThanOrEqualTo: startTimestamp).where('created_at', isLessThanOrEqualTo: endTimestamp).get()`
   Future<Map<String, dynamic>> getRevenueReport(
     DateTime start,
     DateTime end,

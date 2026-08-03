@@ -5,6 +5,15 @@ import '../../widgets/stat_card.dart';
 import '../../users/admin_users_management_page.dart';
 import '../../orders/admin_orders_page.dart';
 
+/// Fungsi: Seksi Ringkasan Metrik & Statistik Utama Dashboard Admin.
+/// Cara Kerja:
+/// 1. Merender susunan Grid (2 Kolom) yang menampilkan 5 kartu statistik utama: Pendapatan, Total Order, Berat Sampah, Jumlah User, dan Jumlah Driver.
+/// 2. Memformat akumulasi nominal mata uang rupiah menggunakan utilitas `AdminFormatter.rupiah`.
+/// 3. Menghubungkan kartu statistik ke halaman manajemen terkait (seperti Halaman Kelola Order atau Halaman Kelola Pengguna/Driver) via `Navigator.push`.
+///
+/// Operasi Data & Navigasi:
+/// - Menerima objek DTO `DashboardStats` yang merupakan hasil agregasi query data statistik dari backend Firestore.
+/// - Menyiapkan `PlaceholderCRUDPage` sebagai fallback visual sementara jika halaman manajemen tertentu belum di-route secara penuh.
 class DashboardStatSection extends StatelessWidget {
   final DashboardStats stats;
 
@@ -36,7 +45,6 @@ class DashboardStatSection extends StatelessWidget {
           icon: Icons.shopping_bag,
           color: Colors.orange,
           onTap: () {
-            // Pindah ke halaman daftar orderan secara keseluruhan saat diklik
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminOrdersPage()),
@@ -87,6 +95,7 @@ class DashboardStatSection extends StatelessWidget {
   }
 }
 
+/// Class Widget: Halaman penampung sementara (Placeholder) untuk modul pengelolaan data CRUD yang sedang dalam tahap pengembangan.
 class PlaceholderCRUDPage extends StatelessWidget {
   final String title;
   final String roleFilter;

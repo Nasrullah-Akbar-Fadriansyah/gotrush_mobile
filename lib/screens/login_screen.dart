@@ -5,6 +5,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 
+/// Fungsi: Halaman Autentikasi Pengguna (Login Screen).
+/// Cara Kerja:
+/// 1. Menerima kredensial email dan password dari formulir.
+/// 2. Memeriksa keberadaan email secara eksplisit di koleksi `users` Firestore.
+/// 3. Melakukan autentikasi menggunakan Firebase Auth (`auth.login`).
+/// 4. Membaca peran pengguna (`role`) dari dokumen Firestore untuk mengarahkan rute navigasi aplikasi (User, Driver, atau Admin).
+///
+/// Operasi CRUD (Read):
+/// - Read 1 (Query Validation): Mencari ketersediaan dokumen email di koleksi `users`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('users').where('email', isEqualTo: targetEmail).limit(1).get()`
+/// - Read 2 (Document Lookup): Mengambil data profil berdasarkan UID dari Firebase Auth.
+///   - Sintaks: `FirebaseFirestore.instance.collection('users').doc(uid).get()`
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -17,6 +29,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
 
+  /// Fungsi: Menangani proses verifikasi data login dan alur navigasi berdasarkan Role.
+  /// Cara Kerja:
+  /// 1. Menguji apakah email terdaftar di database Firestore menggunakan query filter `where`.
+  /// 2. Jika email tidak ditemukan, memunculkan dialog tawaran registrasi (`_showUnregisteredEmailDialog`).
+  /// 3. Memanggil layanan Firebase Authentication dengan timeout 10 detik.
+  /// 4. Mengambil dokumen profil pengguna dari koleksi `users` Firestore untuk membaca atribut `role`.
+  /// 5. Mengarahkan halaman ke rute `/driver`, `/user`, atau `/admin` sesuai perannya.
+  ///
+  /// Operasi CRUD (Read):
+  /// - Read Filter: `.collection('users').where('email', isEqualTo: targetEmail)`
+  /// - Read Document: `.collection('users').doc(uid).get()`
   Future<void> _handleLogin(AuthService auth) async {
     FocusScope.of(context).unfocus();
     setState(() => isLoading = true);
@@ -132,6 +155,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Fungsi: Menampilkan Dialog konfirmasi ketika email yang diinput belum terdaftar.
+  /// Cara Kerja: Memunculkan `AlertDialog` kustom yang memberi opsi pengguna untuk beralih langsung ke halaman Registrasi (`/register`).
   Future<void> _showUnregisteredEmailDialog() async {
     if (mounted) setState(() => isLoading = false);
     return showDialog<void>(
@@ -210,6 +235,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// Fungsi: Menampilkan Dialog Modal umum saat terjadi kegagalan/error pada proses autentikasi.
+  /// Cara Kerja: Menerima argumen `title` dan `message` untuk merender dialog peringatan berwarna merah secara konsisten.
   Future<void> _showErrorDialog({
     required String title,
     required String message,
