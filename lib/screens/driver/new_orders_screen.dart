@@ -7,6 +7,20 @@ import '../../services/auth_service.dart';
 import '../../utils/alerts.dart';
 import '../order_room_screen.dart';
 
+/// Fungsi: Halaman Daftar Pesanan Baru Hari Ini untuk Driver (New Orders Screen).
+/// Cara Kerja:
+/// 1. Mengambil data pesanan masuk berstatus `pending` untuk hari ini melalui method `_orderService.driverTodayOrders`.
+/// 2. Menampilkan rincian informasi pesanan (alamat, nama pemesan, estimasi jarak, harga, dan tanggal penjemputan).
+/// 3. Memfasilitasi penerimaan order via tombol "Terima", yang mengeksekusi pengambilan pesanan secara atomik di backend.
+/// 4. Jika pesanan berhasil diterima, layar secara otomatis berpindah ke `OrderRoomScreen`.
+///
+/// Operasi CRUD (Read Stream & Update/Transaction):
+/// - Read (Stream Realtime):
+///   - Mengambil seluruh daftar pesanan berstatus 'pending' hari ini.
+///     - Sintaks via OrderService: `_orderService.driverTodayOrders(statuses: ['pending'])`
+/// - Update/Transaction (Accept Order):
+///   - Memperbarui `driver_id` dan mengubah status pesanan dari 'pending' menjadi 'active'.
+///     - Sintaks: `_orderService.acceptOrder(orderId, driverId)`
 class NewOrdersScreen extends StatefulWidget {
   const NewOrdersScreen({super.key});
   @override
@@ -30,6 +44,8 @@ class _NewOrdersScreenState extends State<NewOrdersScreen> {
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
+        /// Operasi CRUD (Read Stream):
+        /// Memantau koleksi pesanan terbaru secara real-time.
         stream: _orderService.driverTodayOrders(statuses: ['pending']),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -147,6 +163,8 @@ class _NewOrdersScreenState extends State<NewOrdersScreen> {
                                 backgroundColor: Colors.green[700],
                               ),
                               onPressed: () async {
+                                /// Operasi CRUD (Update/Transaction):
+                                /// Mengeksekusi penerimaan pesanan oleh driver di backend Firestore.
                                 final accepted = await _orderService
                                     .acceptOrder(orderId, driverId);
                                 if (!mounted) return;

@@ -7,6 +7,15 @@ import '../services/auth_service.dart';
 import '../utils/alerts.dart';
 import 'login_screen.dart';
 
+/// Fungsi: Halaman Pendaftaran Akun Baru (Register Screen).
+/// Cara Kerja:
+/// 1. Menyediakan opsi pengisian otomatis nama dan email menggunakan akun Google SDK (`_handleGoogleAutoFill`).
+/// 2. Memvalidasi seluruh elemen formulir (nama, nomor telepon minimal 10 digit, format email, kecocokan password, dan peranan akun).
+/// 3. Mendaftarkan akun baru via Firebase Auth dan menyimpan metadata profil awal ke Firestore melalui layanan `auth.register`.
+///
+/// Operasi CRUD (Create):
+/// - Create User Auth & Document: Membuat kredensial baru di Firebase Authentication dan menyimpan data profil ke koleksi `users`.
+///   - Sintaks: `auth.register(...)` -> diproses via `FirebaseAuth.instance.createUserWithEmailAndPassword()` dan `FirebaseFirestore.instance.collection('users').doc(uid).set(...)`
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -42,6 +51,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  /// Fungsi: Mengambil informasi nama dan email dari akun Google terautentikasi untuk auto-fill input form.
+  /// Cara Kerja: Memanggil method `auth.getGoogleAccountData()`, jika berhasil maka atribut `displayName` dan `email` langsung dimasukkan ke controller form.
   Future<void> _handleGoogleAutoFill() async {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _isGoogleLoading = true);
@@ -86,6 +97,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  /// Fungsi: Mengeksekusi proses pembuatan akun baru di Firebase Auth dan penyimpanannya di Firestore.
+  /// Cara Kerja:
+  /// 1. Menutup keyboard (`unfocus`) dan mengeksekusi validasi formulir (`_formKey.currentState!.validate()`).
+  /// 2. Memanggil method `auth.register` dengan pembatas waktu *timeout* 12 detik.
+  /// 3. Jika registrasi sukses, memunculkan notifikasi sukses dan mengalihkan layar ke `LoginScreen`.
+  ///
+  /// Operasi CRUD (Create):
+  /// - Sintaks Backend: `FirebaseAuth.instance.createUserWithEmailAndPassword(...)` diikuti `FirebaseFirestore.instance.collection('users').doc(user.uid).set(data)`
   Future<void> _handleRegister() async {
     // 1. Unfocus keyboard secara penuh & beri jeda agar animasi IME selesai
     FocusManager.instance.primaryFocus?.unfocus();

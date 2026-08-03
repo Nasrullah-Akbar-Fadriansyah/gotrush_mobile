@@ -6,6 +6,12 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+/// Fungsi: Antarmuka pemeliharaan/pemilihan titik koordinat lokasi penjemputan berbasis peta OpenStreetMap.
+/// Cara Kerja:
+/// 1. Mengambil lokasi GPS pengguna saat pertama dibuka (`_getCurrentUserLocation`).
+/// 2. Merender peta interaktif dengan pin penanda tepat di tengah layar.
+/// 3. Setiap kali peta digeser (`onPositionChanged`), mendeteksi koordinat baru dan menjalankan *reverse geocoding* dengan teknik *debounce*.
+/// 4. Saat tombol konfirmasi ditekan, mengembalikan koordinat lokasi berupa `firestore.GeoPoint` dan string alamat lengkap ke layar sebelumnya
 class MapSelectionScreen extends StatefulWidget {
   const MapSelectionScreen({super.key});
 
@@ -21,7 +27,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
 
   String? _selectedAddress;
   bool _loadingAddress = false;
-  bool _loadingLocation = true; // Status loading GPS
+  bool _loadingLocation = true;
 
   Timer? _debounce;
 
@@ -31,7 +37,11 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     _getCurrentUserLocation();
   }
 
-  /// Mengambil lokasi nyata dari GPS Device
+  /// Fungsi: Mengambil posisi lokasi nyata pengguna dari perangkat keras GPS.
+  /// Cara Kerja:
+  /// 1. Menguji status aktif sensor GPS (`Geolocator.isLocationServiceEnabled`).
+  /// 2. Menguji dan meminta hak akses izin lokasi ke sistem operasi.
+  /// 3. Mendapatkan koordinat `Position`, memindahkan kamera peta via `_mapController.move`, dan menginisialisasi pembacaan alamat.
   Future<void> _getCurrentUserLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -85,6 +95,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     }
   }
 
+  /// Fungsi: Mengatur posisi peta fallback jika GPS gagal didapatkan dan memunculkan pesan peringatan.
   void _setDefaultLocation(String errorMessage) {
     if (!mounted) return;
     setState(() {
@@ -96,10 +107,12 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     ).showSnackBar(SnackBar(content: Text(errorMessage)));
   }
 
+  /// Fungsi: Melakukan konversi dari titik koordinat peta (LatLng) menjadi nama alamat teks (Reverse Geocoding).
+  /// Cara Kerja: Menggunakan `Timer` debounce sebesar 100 ms untuk mencegah panggilan beruntun berlebihan saat peta digeser dengan cepat.
   Future<void> _reverseGeocode(LatLng point) async {
     _debounce?.cancel();
 
-    _debounce = Timer(const Duration(milliseconds: 10), () async {
+    _debounce = Timer(const Duration(milliseconds: 100), () async {
       if (!mounted) return;
 
       setState(() {
@@ -154,6 +167,8 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     });
   }
 
+  /// Fungsi: Mengonfirmasi lokasi terpilih dan mengembalikannya ke layar pemanggil (Order Form).
+  /// Cara Kerja: Mengubah atribut latitude dan longitude menjadi objek `firestore.GeoPoint`, lalu menutup layar (`Navigator.pop`).
   void _confirm() {
     Navigator.pop(context, {
       "location": firestore.GeoPoint(

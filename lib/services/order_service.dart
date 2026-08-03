@@ -1,16 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+/// Fungsi: Layanan Manajemen Operasional Transaksi dan Siklus Hidup Pesanan (Order Service).
+/// Cara Kerja:
+/// 1. Mengelola seluruh tahapan pesanan penjemputan sampah dari pembuatan awal, klaim order oleh driver, negosiasi & konfirmasi berat, pembayaran, konfirmasi tiba/penjemputan, hingga penyelesaian & pengarsipan.
+/// 2. Memanfaatkan fitur **WriteBatch** untuk menuliskan data secara bersamaan ke dua koleksi (`orders` dan `order_history`) agar data riwayat tidak pernah ketinggalan.
+/// 3. Memanfaatkan **Firestore Transactions** (`runTransaction`) pada operasi kritis (seperti `acceptOrder` atau `confirmWeightByUser`) untuk mencegah bentrokan data (*race condition*) antar pengguna/driver.
+///
+/// Operasi CRUD (Create, Read Stream/Single, Update Batch/Transaction, & Archive):
+/// - Create (WriteBatch):
+///   - Membuat dokumen order baru di koleksi `orders` dan `order_history`:
+///     `batch.set(orderRef, data); batch.set(historyRef, {...}); await batch.commit();`
+/// - Read (Stream Queries & Get):
+///   - Membaca daftar order aktif/penjemputan driver via Stream:
+///     `_db.collection('orders').where("status", whereIn: visible).snapshots()`
+///   - Membaca data lengkap satu order: `_db.collection("orders").doc(orderId).get()`
+/// - Update (Transactions & Batches):
+///   - Mengambil orderan secara aman: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true))`
+///   - Mengajukan berat, mengonfirmasi penjemputan, dan mengubah status pembayaran.
+/// - Delete / Archive (Logical Delete / Status Update):
+///   - Menandai dokumen pesanan sebagai terarsip (`archived: true`):
+///     `batch.update(orderRef, {"archived": true, "archived_at": FieldValue.serverTimestamp()})`
 class OrderService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// Fungsi: Membuat atau menambahkan pesanan (*order*) baru ke dalam database Cloud Firestore secara bersamaan (*atomic batch*).
   /// Cara Kerja:
-  /// 1. Menerima data masukan (parameter) lengkap mengenai detail pesanan sampah dari pengguna (seperti berat, jarak, harga, alamat, koordinat GPS, foto, nama, dan nomor telepon).
-  /// 2. Menyusun data tersebut ke dalam struktur objek `Map` (JSON) bernama `data`, serta menambahkan informasi default seperti `payment_status: "pending"`, status arsip, dan stempel waktu server (`FieldValue.serverTimestamp()`).
-  /// 3. Menggunakan fitur `WriteBatch` (`_db.batch()`) milik Firestore. Fitur ini mengelompokkan beberapa perintah tulis menjadi satu baris transaksi aman (*All-or-Nothing*).
-  /// 4. Menyiapkan dua target dokumen baru dengan ID pesanan yang sama (`orderId`), yaitu pada tabel/koleksi `'orders'` dan koleksi rekam jejak `'order_history'`.
-  /// 5. Menuliskan data tersebut ke kedua koleksi secara serentak melalui perintah `batch.commit()`. Jika salah satu gagal (misal koneksi terputus di tengah jalan), maka kedua data tersebut dibatalkan secara otomatis agar database tetap konsisten dan tidak korup
+  /// 1. Menerima data masukan lengkap mengenai detail pesanan sampah dari pengguna (berat, jarak, harga, alamat, koordinat GPS, foto, nama, dan telepon).
+  /// 2. Menyusun data ke dalam objek `Map` bernama `data`, serta menambahkan status default `payment_status: "pending"` dan stempel waktu server.
+  /// 3. Menggunakan `WriteBatch` (`_db.batch()`) untuk mengelompokkan perintah tulis ke dua koleksi (`orders` dan `order_history`) secara serentak.
+  /// Operasi CRUD (Create Batch):
+  /// - Sintaks: `batch.set(orderRef, data); batch.set(historyRef, data); await batch.commit();`
   Future<void> createOrder({
     required String orderId,
     required String userId,
@@ -62,15 +82,12 @@ class OrderService {
     await batch.commit();
   }
 
-  /// Fungsi: Mengubah status pesanan ketika driver mengambil atau menerima orderan (`accept order`).
-  /// Fungsi ini mengembalikan nilai boolean (`true` jika berhasil diambil oleh driver, atau `false` jika gagal).
+  /// Fungsi: Mengubah status pesanan ketika driver mengambil atau menerima orderan (`accept order`) secara aman.
   /// Cara Kerja:
-  /// 1. Menentukan referensi dokumen pesanan di koleksi `'orders'` dan `'order_history'` berdasarkan `orderId`.
-  /// 2. Menggunakan sistem **Transaction** (`_db.runTransaction`). Berbeda dengan batch, transaksi ini membaca data server terlebih dahulu untuk memastikan kondisi terkini sebelum menulis. Ini sangat krusial agar orderan tidak bisa "berebutan" atau diambil oleh dua driver sekaligus (*Race Condition*).
-  /// 3. Di dalam transaksi, aplikasi mengambil (*get*) data pesanan terbaru dari server.
-  /// 4. Melakukan validasi status: Jika pesanan tidak ada atau statusnya sudah berubah (bukan `'pending'` lagi, misalnya sudah diambil driver lain), transaksi langsung dibatalkan dan mengembalikan nilai `false`.
-  /// 5. Jika status lolos validasi (masih `'pending'`), transaksi akan memperbarui data dokumen dengan memasukkan `driver_id` penjemput, mengubah status menjadi `'active'`, serta mencatat waktu `accepted_at`.
-  /// 6. Menulis perubahan tersebut ke koleksi `'orders'` dan menggabungkannya (*merge*) ke `'order_history'`, lalu mengembalikan nilai `true`. Jika ada kendala jaringan, proses otomatis dialihkan ke blok `catch` dan mengembalikan nilai `false`.
+  /// 1. Menggunakan **Transaction** (`_db.runTransaction`) untuk membaca kondisi terkini sebelum menulis.
+  /// 2. Memastikan status order masih `'pending'`. Jika sudah diambil driver lain, transaksi membatalkan proses dan mengembalikan `false`.
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<bool> acceptOrder(String orderId, String driverId) async {
     final orderRef = _db.collection('orders').doc(orderId);
     final historyRef = _db.collection('order_history').doc(orderId);
@@ -109,6 +126,9 @@ class OrderService {
     }
   }
 
+  /// Fungsi: Memperbarui status tahapan pesanan dan menyinkronkan data ke koleksi riwayat via `WriteBatch`.
+  /// Operasi CRUD (Update Batch):
+  /// - Sintaks: `batch.update(orderRef, update); batch.set(historyRef, merged, SetOptions(merge: true)); await batch.commit();`
   Future<void> updateStatus(String orderId, String newStatus) async {
     final orderRef = _db.collection('orders').doc(orderId);
     final historyRef = _db.collection('order_history').doc(orderId);
@@ -135,6 +155,9 @@ class OrderService {
     }
   }
 
+  /// Fungsi: Menambahkan URL foto bukti penjemputan selesai dan mengubah status menjadi `completed`.
+  /// Operasi CRUD (Update Field Array & Set History):
+  /// - Sintaks: `batch.update(orderRef, {'photo_urls': FieldValue.arrayUnion([photoUrl]), ...}); await batch.commit();`
   Future<void> addCompletionPhoto(String orderId, String photoUrl) async {
     final fullData = await _getFullOrderData(orderId);
 
@@ -159,6 +182,9 @@ class OrderService {
     await _archiveOrder(orderId);
   }
 
+  /// Fungsi Internal: Menandai dokumen pesanan sebagai terarsip (`archived: true`).
+  /// Operasi CRUD (Update Archive Flag):
+  /// - Sintaks: `batch.update(orderRef, {'archived': true, ...}); await batch.commit();`
   Future<void> _archiveOrder(String orderId) async {
     final orderRef = _db.collection('orders').doc(orderId);
     final historyRef = _db.collection('order_history').doc(orderId);
@@ -178,6 +204,9 @@ class OrderService {
     await batch.commit();
   }
 
+  /// Fungsi: Mengambil aliran (*stream*) daftar pesanan yang dapat dilihat oleh driver berdasarkan kriteria status.
+  /// Operasi CRUD (Read Stream Query):
+  /// - Sintaks: `_db.collection('orders').where("status", whereIn: visible).snapshots()`
   Stream<QuerySnapshot> driverOrders({List<String>? statuses}) {
     final List<String> visible = statuses ?? ['pending'];
     return _db
@@ -186,11 +215,17 @@ class OrderService {
         .snapshots();
   }
 
+  /// Fungsi Helper: Membaca dokumen lengkap pesanan satu kali dari koleksi `orders`.
+  /// Operasi CRUD (Read Single Document):
+  /// - Sintaks: `_db.collection("orders").doc(orderId).get()`
   Future<Map<String, dynamic>> _getFullOrderData(String orderId) async {
     final doc = await _db.collection("orders").doc(orderId).get();
     return Map<String, dynamic>.from(doc.data() ?? {});
   }
 
+  /// Fungsi: Mengajukan estimasi berat sampah baru oleh driver (*propose weight*).
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> proposeWeight({
     required String orderId,
     required String driverId,
@@ -217,6 +252,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Mengonfirmasi perubahan berat sampah oleh pengguna dan mengalkulasi ulang total biaya transaksi.
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> confirmWeightByUser({
     required String orderId,
     required String userId,
@@ -249,6 +287,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Mengajukan sanggahan/sengketa (*dispute*) berat sampah oleh pengguna.
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> disputeWeightByUser({
     required String orderId,
     required String userId,
@@ -277,6 +318,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Menandai pembayaran sukses dan memperbarui status pesanan menjadi validasi penjemputan (`pickup_validation`).
+  /// Operasi CRUD (Update Batch):
+  /// - Sintaks: `batch.update(orderRef, update); batch.set(historyRef, update, SetOptions(merge: true)); await batch.commit();`
   Future<void> markPaymentSuccessToPickupValidation({
     required String orderId,
   }) async {
@@ -293,6 +337,9 @@ class OrderService {
     await batch.commit();
   }
 
+  /// Fungsi: Konfirmasi oleh driver bahwa sampah telah diambil dan menunggu validasi dari pengguna.
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> driverConfirmPickup({
     required String orderId,
     required String driverId,
@@ -317,6 +364,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Mengembalikan (*reset*) status penjemputan driver kembali ke status `arrived`.
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> driverResetPickupConfirmation({
     required String orderId,
     required String driverId,
@@ -340,6 +390,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Merespons permintaan validasi penjemputan dari pengguna (mengonfirmasi atau menolak).
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> userRespondPickupValidation({
     required String orderId,
     required String userId,
@@ -367,6 +420,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Menandai bahwa driver telah tiba di lokasi penjemputan pengguna (`arrived`).
+  /// Operasi CRUD (Update Transaction):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> driverArrived({
     required String orderId,
     required String driverId,
@@ -391,6 +447,9 @@ class OrderService {
     });
   }
 
+  /// Fungsi: Menandai transaksi pesanan telah selesai penuh oleh driver (`completed`) lalu mengarsipkannya.
+  /// Operasi CRUD (Update Transaction & Auto Archive):
+  /// - Sintaks: `tx.update(orderRef, update); tx.set(historyRef, update, SetOptions(merge: true));`
   Future<void> driverCompleteOrder({
     required String orderId,
     required String driverId,
@@ -419,6 +478,17 @@ class OrderService {
     await _archiveOrder(orderId);
   }
 
+  /// Fungsi: Mengambil aliran (*stream*) daftar pesanan masuk khusus untuk hari ini yang belum memiliki driver.
+  /// Operasi CRUD (Read Stream Filtered Query):
+  /// - Sintaks:
+  ///   ```dart
+  ///   _db.collection('orders')
+  ///       .where('status', whereIn: visible)
+  ///       .where('driver_id', isNull: true)
+  ///       .where('pickup_date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+  ///       .where('pickup_date', isLessThan: Timestamp.fromDate(endOfDay))
+  ///       .snapshots();
+  ///   ```
   Stream<QuerySnapshot> driverTodayOrders({List<String>? statuses}) {
     final List<String> visible = statuses ?? ['pending'];
 

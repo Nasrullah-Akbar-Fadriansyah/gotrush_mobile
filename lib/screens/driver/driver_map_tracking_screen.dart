@@ -11,6 +11,22 @@ import '../../../services/auth_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/order_service.dart';
 
+/// Fungsi: Halaman Peta Pelacakan Rute Driver ke Lokasi Pengguna (Driver Map Tracking Screen).
+/// Cara Kerja:
+/// 1. Menerima posisi `userLocation` dan `orderId` dari halaman sebelumnya.
+/// 2. Mendengarkan pembaruan koordinat GPS driver secara real-time dari Firestore koleksi `drivers_location`.
+/// 3. Meminta rute jalan raya dari OSRM API (Open Source Routing Machine) dan merendernya sebagai garis Polyline di atas peta.
+/// 4. Menyediakan tombol Floating Action Button yang interaktif sesuai dengan tahapan status pesanan (`arrived`, `pickup_confirmed`).
+///
+/// Operasi CRUD (Read & Update/Call):
+/// - Read (Stream Realtime Document):
+///   - Mendengarkan perubahan dokumen lokasi driver.
+///     - Sintaks: `firestore.FirebaseFirestore.instance.collection('drivers_location').doc(driverId).snapshots()`
+///   - Mendengarkan status dokumen pesanan aktif.
+///     - Sintaks: `firestore.FirebaseFirestore.instance.collection('orders').doc(widget.orderId).snapshots()`
+/// - Update (via OrderService):
+///   - Mengubah status pesanan menjadi 'arrived' (Driver Tiba) atau 'pickup_validation' (Konfirmasi Ambil).
+///     - Sintaks: `OrderService().driverArrived(...)` & `OrderService().driverConfirmPickup(...)`
 class DriverMapTrackingScreen extends StatefulWidget {
   final String orderId;
   final firestore.GeoPoint userLocation;
@@ -52,7 +68,9 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
     _fetchCurrentDriverPositionAndRoute();
   }
 
-  /// Mendengarkan update lokasi driver secara real-time dari Firestore
+  /// Fungsi: Mendengarkan update lokasi driver secara real-time dari koleksi Firestore `drivers_location`.
+  /// Operasi CRUD (Read Stream):
+  /// - Sintaks: `firestore.FirebaseFirestore.instance.collection('drivers_location').doc(driverId).snapshots()`
   void _listenToDriverLocation() {
     final auth = Provider.of<AuthService>(context, listen: false);
     final driverId = widget.watchDriverId ?? auth.currentUser?.uid;
@@ -98,7 +116,7 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
         });
   }
 
-  /// Mengambil lokasi GPS awal Driver untuk inisialisasi awal
+  /// Fungsi: Mengambil posisi lokasi perangkat GPS driver saat ini secara lokal via paket Geolocator.
   Future<void> _fetchCurrentDriverPositionAndRoute() async {
     try {
       Position currentPosition = await Geolocator.getCurrentPosition(
@@ -128,7 +146,7 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
     }
   }
 
-  /// Mengambil rute via OSRM (Open Source Routing Machine)
+  /// Fungsi: Memanggil OSRM Routing Service HTTP Endpoint untuk mendapatkan deretan koordinat rute jalan raya.
   Future<void> _loadRoute(LatLng origin, LatLng destination) async {
     if (_isLoadingRoute) return;
     _isLoadingRoute = true;
@@ -165,11 +183,11 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
     }
   }
 
-  /// Menyesuaikan kamera peta secara aman agar tidak memicu NaN / Infinity Exception
+  /// Fungsi: Menyesuaikan batas viewport kamera peta secara dinamis agar mencakup posisi driver dan tujuan.
   void _fitMapBounds() {
     if (!mounted || _driverLocation == null) return;
 
-    final Distance distance = const Distance();
+    Distance distance = const Distance();
     final double meterDistance = distance.as(
       LengthUnit.Meter,
       _driverLocation!,
@@ -282,96 +300,100 @@ class _DriverMapTrackingScreenState extends State<DriverMapTrackingScreen> {
           ),
         ],
       ),
-      floatingActionButton:
-          StreamBuilder<firestore.DocumentSnapshot<Map<String, dynamic>>>(
-            stream: firestore.FirebaseFirestore.instance
-                .collection('orders')
-                .doc(widget.orderId)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
-              final order = snapshot.data!.data();
-              if (order == null) return const SizedBox.shrink();
-              final status = order['status'] as String? ?? '';
-              final paymentStatus = order['payment_status'] as String?;
-              final auth = Provider.of<AuthService>(context, listen: false);
-              final currentUid = auth.currentUser?.uid;
-              final isViewerDriver =
-                  (widget.watchDriverId == null) ||
-                  (widget.watchDriverId != null &&
-                      widget.watchDriverId == currentUid);
+      floatingActionButton: StreamBuilder<firestore.DocumentSnapshot<Map<String, dynamic>>>(
+        /// Operasi CRUD (Read Stream):
+        /// Memantau perubahan status pesanan untuk menyesuaikan tombol tindakan driver.
+        /// - Sintaks: `firestore.FirebaseFirestore.instance.collection('orders').doc(widget.orderId).snapshots()`
+        stream: firestore.FirebaseFirestore.instance
+            .collection('orders')
+            .doc(widget.orderId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const SizedBox.shrink();
+          final order = snapshot.data!.data();
+          if (order == null) return const SizedBox.shrink();
+          final status = order['status'] as String? ?? '';
+          final paymentStatus = order['payment_status'] as String?;
+          final auth = Provider.of<AuthService>(context, listen: false);
+          final currentUid = auth.currentUser?.uid;
+          final isViewerDriver =
+              (widget.watchDriverId == null) ||
+              (widget.watchDriverId != null &&
+                  widget.watchDriverId == currentUid);
 
-              if (isViewerDriver &&
-                  (status == 'active' || status == 'awaiting_confirmation')) {
-                return FloatingActionButton.extended(
-                  onPressed: () async {
-                    try {
-                      final driverId = auth.currentUser?.uid ?? '';
-                      await OrderService().driverArrived(
+          if (isViewerDriver &&
+              (status == 'active' || status == 'awaiting_confirmation')) {
+            return FloatingActionButton.extended(
+              onPressed: () async {
+                try {
+                  final driverId = auth.currentUser?.uid ?? '';
+
+                  /// Operasi CRUD (Update Status via Service):
+                  /// Mengubah status pesanan menjadi 'arrived'.
+                  await OrderService().driverArrived(
+                    orderId: widget.orderId,
+                    driverId: driverId,
+                  );
+                  try {
+                    final doc = await firestore.FirebaseFirestore.instance
+                        .collection('orders')
+                        .doc(widget.orderId)
+                        .get();
+                    final data = doc.data();
+                    final userId = data?['user_id'] as String?;
+                    if (userId != null && userId.isNotEmpty) {
+                      await NotificationService().notifyUserDriverArrived(
                         orderId: widget.orderId,
-                        driverId: driverId,
+                        userId: userId,
                       );
-                      try {
-                        final doc = await firestore.FirebaseFirestore.instance
-                            .collection('orders')
-                            .doc(widget.orderId)
-                            .get();
-                        final data = doc.data();
-                        final userId = data?['user_id'] as String?;
-                        if (userId != null && userId.isNotEmpty) {
-                          await NotificationService().notifyUserDriverArrived(
-                            orderId: widget.orderId,
-                            userId: userId,
-                          );
-                        }
-                      } catch (_) {}
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ditandai: Tiba di lokasi'),
-                        ),
-                      );
-                    } catch (e) {
-                      debugPrint('Gagal tandai tiba: $e');
                     }
-                  },
-                  label: const Text('Tiba di Lokasi'),
-                  icon: const Icon(Icons.place),
-                  backgroundColor: Colors.blue[700],
-                );
-              }
+                  } catch (_) {}
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Ditandai: Tiba di lokasi')),
+                  );
+                } catch (e) {
+                  debugPrint('Gagal tandai tiba: $e');
+                }
+              },
+              label: const Text('Tiba di Lokasi'),
+              icon: const Icon(Icons.place),
+              backgroundColor: Colors.blue[700],
+            );
+          }
 
-              if (isViewerDriver &&
-                  (status == 'arrived') &&
-                  (paymentStatus == 'success' || paymentStatus == 'paid')) {
-                return FloatingActionButton.extended(
-                  onPressed: () async {
-                    try {
-                      final driverId = auth.currentUser?.uid ?? '';
-                      await OrderService().driverConfirmPickup(
-                        orderId: widget.orderId,
-                        driverId: driverId,
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Konfirmasi ambil dikirim'),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Gagal konfirmasi ambil: $e');
-                    }
-                  },
-                  label: const Text('Konfirmasi Ambil'),
-                  icon: const Icon(Icons.shopping_bag),
-                  backgroundColor: Colors.orange[700],
-                );
-              }
+          if (isViewerDriver &&
+              (status == 'arrived') &&
+              (paymentStatus == 'success' || paymentStatus == 'paid')) {
+            return FloatingActionButton.extended(
+              onPressed: () async {
+                try {
+                  final driverId = auth.currentUser?.uid ?? '';
 
-              return const SizedBox.shrink();
-            },
-          ),
+                  /// Operasi CRUD (Update Status via Service):
+                  /// Mengubah status pesanan untuk tahap validasi pengambilan sampah.
+                  await OrderService().driverConfirmPickup(
+                    orderId: widget.orderId,
+                    driverId: driverId,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Konfirmasi ambil dikirim')),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('Gagal konfirmasi ambil: $e');
+                }
+              },
+              label: const Text('Konfirmasi Ambil'),
+              icon: const Icon(Icons.shopping_bag),
+              backgroundColor: Colors.orange[700],
+            );
+          }
+
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 }

@@ -8,6 +8,18 @@ import 'package:latlong2/latlong.dart';
 import '/utils/alerts.dart';
 import 'package:http/http.dart' as http;
 
+/// Fungsi: Antarmuka pelacakan lokasi posisi Driver dan Pengguna secara langsung (Live Tracking) serta pembuatan rute jalan.
+/// Cara Kerja:
+/// 1. Mendengarkan perubahan koordinat Driver dan Pengguna secara paralel via Firestore Stream Listener (`_listenToLocations`).
+/// 2. Menghitung jarak fisik langsung antar kedua titik dan menampilkan pemberitahuan jika Driver berjarak <= 200 meter.
+/// 3. Mengambil titik-titik rute perjalanan dari API OSRM (`_loadRoute`) dan menggambarkannya menggunakan `PolylineLayer`.
+/// 4. Otomatis menyesuaikan batas fokus peta (`fitCamera`) agar koordinat Driver dan Pengguna selalu terlihat secara bersamaan.
+///
+/// Operasi CRUD (Read - Realtime Stream):
+/// - Read 1: Berlangganan koordinat Driver dari koleksi `drivers_location`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('drivers_location').doc(driverId).snapshots()`
+/// - Read 2: Berlangganan koordinat Pengguna dari koleksi `users_location`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('users_location').doc(userId).snapshots()`
 class MapTrackingScreen extends StatefulWidget {
   final String orderId;
   final String driverId;
@@ -56,6 +68,14 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
     _listenToLocations();
   }
 
+  /// Fungsi: Mengaktifkan pemantauan lokasi real-time dari koleksi Firestore untuk Driver dan User.
+  /// Cara Kerja:
+  /// 1. Mengaitkan stream `.snapshots()` pada dokumen `drivers_location` dan `users_location`.
+  /// 2. Memparsing atribut `latitude` dan `longitude` secara aman dari Firestore.
+  /// 3. Memperbarui UI, menguji jarak tempuh, menggerakkan kamera peta, dan mendaftarkan pembaruan rute OSRM.
+  ///
+  /// Operasi CRUD (Read - Stream):
+  /// - Sintaks Stream: `.collection('drivers_location').doc(id).snapshots().listen(...)`
   void _listenToLocations() {
     _driverSub = FirebaseFirestore.instance
         .collection('drivers_location')
@@ -132,6 +152,8 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
         );
   }
 
+  /// Fungsi: Menghitung jarak linier antara lokasi driver dan pengguna serta memberikan notifikasi saat mendekat.
+  /// Cara Kerja: Menggunakan `Geolocator.distanceBetween`. Jika jarak <= 200m dan notifikasi belum terkirim, menampilkan `SnackBar` peringatan.
   void _checkDistanceAndNotify() {
     if (_driverLocation == null || _userLocation == null) return;
 
@@ -163,6 +185,7 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
     }
   }
 
+  /// Fungsi Helper: Menghitung jarak antar dua objek `LatLng` dalam satuan meter.
   double _distanceBetween(LatLng a, LatLng b) {
     return Geolocator.distanceBetween(
       a.latitude,
@@ -172,6 +195,8 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
     );
   }
 
+  /// Fungsi: Memetakan penjadwalan pembaruan rute jalan dengan metode pembatasan frekuensi (Debounce & Cache Threshold).
+  /// Cara Kerja: Hanya mengeksekusi pengambilan rute jika posisi driver/user bergeser > 30 meter atau selisih waktu permintaan > 10 detik.
   void _scheduleRouteUpdate() {
     if (_driverLocation == null || _userLocation == null) return;
     _routeDebounce = Timer(const Duration(seconds: 2), () async {
@@ -210,6 +235,8 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
     });
   }
 
+  /// Fungsi: Menyesuaikan posisi zoom dan titik pusat kamera peta agar mencakup kedua penanda (Driver & User).
+  /// Cara Kerja: Menggunakan `LatLngBounds.fromPoints` dan dipasangkan ke `_mapController.fitCamera` dengan *padding* 80 piksel.
   void _moveCamera() {
     if (!mounted) return;
 
@@ -233,6 +260,8 @@ class _MapTrackingScreenState extends State<MapTrackingScreen> {
     }
   }
 
+  /// Fungsi: Mengambil data GeoJSON rute navigasi dari server OSRM (Open Source Routing Machine) via HTTP GET.
+  /// Cara Kerja: Memanggil REST API OSRM, menguraikan koordinat array GeoJSON, dan memasukkannya ke dalam list `_routePoints` untuk dirender oleh `PolylineLayer`.
   Future<void> _loadRoute() async {
     if (_driverLocation == null || _userLocation == null) return;
     if (_isLoadingRoute) return;

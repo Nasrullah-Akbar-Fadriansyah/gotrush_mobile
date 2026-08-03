@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../models/top_user_model.dart';
 
+/// Fungsi: Bagian Komponen Peringkat Pelanggan/User Teraktif (Leaderboard).
+/// Cara Kerja:
+/// 1. Menerima daftar pengguna paling aktif (`users`) berdasarkan jumlah transaksi order dan total berat sampah yang disetorkan.
+/// 2. Menampilkan susunan daftar bernomor (`ListView.separated`) lengkap dengan Avatar peringkat ($1..N$).
+/// 3. Menampilkan rincian statistik tiap pelanggan berupa jumlah total order serta total berat (Kg) sampah yang berhasil didaur ulang.
+///
+/// Operasi Data & Presentasi:
+/// - Menerima masukan berupa `List<TopUserModel>` yang terikat pada data pengguna aktif di database.
 class TopUserSection extends StatelessWidget {
   final List<TopUserModel> users;
 
@@ -31,7 +39,7 @@ class TopUserSection extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 20.0),
                     child: Center(
                       child: Text(
-                        "Belum ada data pelanggan teraktif.",
+                        "Belum ada pelanggan teraktif.",
                         style: TextStyle(color: Colors.grey),
                       ),
                     ),

@@ -6,6 +6,16 @@ import 'sections/dashboard_stat_section.dart';
 import 'sections/dashboard_chart_section.dart';
 import '../widgets/latest_orders.dart';
 
+/// Fungsi: Halaman Utama Dashboard Admin GoTrash.
+/// Cara Kerja:
+/// 1. Menginisialisasi `DashboardService` untuk memantau perubahan koleksi pesanan (`orders`) secara real-time.
+/// 2. Menggunakan `StreamBuilder` berbasis `DashboardData` untuk memperbarui UI secara otomatis jika terjadi perubahan data pada Firestore.
+/// 3. Menyediakan dukungan gesture `RefreshIndicator` (Pull-to-Refresh) untuk memicu pembaruan aliran data secara manual.
+/// 4. Merender susunan seksi komponen dashboard: Header, Kartu Statistik, Grafik Analitik (Pendapatan & Order), serta Aktivitas Pesanan Terbaru.
+///
+/// Operasi CRUD (Read Stream):
+/// - Membuka aliran data real-time snapshot dari Firestore koleksi `orders` via `service.streamDashboard()`.
+/// - Sintaks: `FirebaseFirestore.instance.collection('orders').snapshots()`
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -23,6 +33,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     dashboardStream = service.streamDashboard();
   }
 
+  /// Fungsi: Memperbarui alur aliran data (Stream) secara manual saat pengguna menarik layar ke bawah (Pull-to-Refresh).
   Future<void> _manualRefresh() async {
     setState(() {
       dashboardStream = service.streamDashboard();

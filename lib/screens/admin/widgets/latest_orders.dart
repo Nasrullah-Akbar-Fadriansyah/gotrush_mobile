@@ -3,9 +3,27 @@ import '../models/admin_latest_order.dart';
 import '../utils/admin_formatter.dart';
 import '../orders/order_detail_page.dart';
 
+/// Fungsi: Widget Daftar Transaksi Pesanan Terbaru di Dashboard Admin.
+/// Cara Kerja:
+/// 1. Menerima daftar model `List<AdminLatestOrder>` hasil query dari `DashboardService`.
+/// 2. Jika daftar kosong, merender tampilan status kosong (*Empty State*).
+/// 3. Jika berisi data, merender daftar item pesanan (`ListView.separated`) yang memuat nama pemesan, nama driver, berat sampah, total harga terformat, dan badge status.
+/// 4. Saat item ditekan (`InkWell.onTap`), mengarahkan admin ke `OrderDetailPage` dan pemicu panggil fungsi penyegaran data (`onRefresh`) ketika kembali.
+///
+/// Operasi Data & Navigasi:
+/// - Membaca data dari `AdminLatestOrder` dan memformat nominal Rupiah menggunakan `AdminFormatter.rupiah(order.price)`.
+/// - Mengeksekusi navigasi asinkron:
+///   ```dart
+///   await Navigator.push(
+///     context,
+///     MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: order.id)),
+///   );
+///   if (onRefresh != null) onRefresh!();
+///   ```
 class LatestOrders extends StatelessWidget {
   final List<AdminLatestOrder> orders;
-  final VoidCallback? onRefresh; // Tambahan callback untuk refresh dashboard
+  final VoidCallback?
+  onRefresh; // Callback untuk memicu penyegaran data dashboard
 
   const LatestOrders({super.key, required this.orders, this.onRefresh});
 
@@ -45,7 +63,7 @@ class LatestOrders extends StatelessWidget {
 
                   return InkWell(
                     onTap: () async {
-                      // Menunggu halaman detail ditutup, lalu pTrigger refresh
+                      // Menunggu halaman detail ditutup, lalu pemicu panggil refresh
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -142,6 +160,7 @@ class LatestOrders extends StatelessWidget {
   }
 }
 
+/// Fungsi Helper UI: Membangun komponen badge chip penanda status pesanan dengan skema warna dinamis.
 Widget _statusChip(String rawStatus) {
   Color color;
   String label;

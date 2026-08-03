@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+/// Fungsi: Widget Kartu Ringkasan Metrik Statistik Utama (Dashboard Metric Stat Card).
+/// Cara Kerja:
+/// 1. Menerima data ikon (`icon`), judul metrik (`title`), nilai angka/teks (`value`), warna tema (`color`), serta penanganan gesture ketukan (`onTap`).
+/// 2. Menggunakan `FittedBox` agar ukuran teks nilai otomatis menyesuaikan skala agar tidak menyebabkan luapan (*overflow*) pada layar berukuran kecil.
+/// 3. Mendukung responsivitas klik via `InkWell` dengan batas sudut ikuti bentuk `Card`.
+///
+/// Operasi Data & Presentasi:
+/// - Digunakan oleh `DashboardStatSection` untuk merender kartu statistik seperti Total Pemasukan, Total Order, Berat Sampah, Jumlah User, dan Jumlah Driver.
 class StatCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -23,20 +31,15 @@ class StatCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(
-          14,
-        ), // Agar efek klik mengikuti sudut Card
+        borderRadius: BorderRadius.circular(14), // Mengikuti sudut Card
         child: Padding(
-          padding: const EdgeInsets.all(
-            12,
-          ), // Mengurangi padding agar ruang lebih luas
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment
-                .spaceBetween, // Distribusi ruang vertikal rata
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               CircleAvatar(
-                radius: 18, // Sedikit mengecilkan avatar ikon
+                radius: 18,
                 backgroundColor: color.withValues(alpha: 0.15),
                 child: Icon(icon, color: color, size: 20),
               ),
@@ -50,7 +53,6 @@ class StatCard extends StatelessWidget {
               const SizedBox(height: 4),
               Expanded(
                 child: Align(
-                  // Menggunakan Align (Widget), bukan Alignment
                   alignment: Alignment.bottomLeft,
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -58,7 +60,7 @@ class StatCard extends StatelessWidget {
                       value,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 20, // Ukuran ideal dasar
+                        fontSize: 20,
                       ),
                     ),
                   ),

@@ -8,6 +8,14 @@ import 'widgets/order_info_card.dart';
 import 'widgets/photo_card.dart';
 import 'widgets/timeline_card.dart';
 
+/// Fungsi: Halaman Tampilan Rincian Lengkap Pesanan Transaksi (Order Detail Page).
+/// Cara Kerja:
+/// 1. Menerima parameter `orderId` (Firestore Document ID) saat dinavigasi dari halaman daftar pesanan.
+/// 2. Menggunakan `FutureBuilder` untuk mengeksekusi metode `OrderService().getOrderDetail(orderId)` secara asinkron.
+/// 3. Merender struktur komponen modular: `StatusCard`, `UserInfoCard`, `DriverInfoCard`, `OrderInfoCard`, `PhotoCard`, dan `TimelineCard`.
+///
+/// Operasi CRUD (Read Detail Document):
+/// - Memanggil `service.getOrderDetail(widget.orderId)` untuk mengambil data lengkap transaksi, identitas pemesan, dan data driver.
 class OrderDetailPage extends StatefulWidget {
   final String orderId;
 
@@ -25,7 +33,6 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   @override
   void initState() {
     super.initState();
-
     orderFuture = service.getOrderDetail(widget.orderId);
   }
 
@@ -33,7 +40,6 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Detail Order")),
-
       body: FutureBuilder<OrderDetailModel>(
         future: orderFuture,
         builder: (context, snapshot) {
@@ -49,30 +55,19 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 StatusCard(order: order),
-
                 const SizedBox(height: 16),
-
                 UserInfoCard(order: order),
-
                 const SizedBox(height: 16),
-
                 DriverInfoCard(order: order),
-
                 const SizedBox(height: 16),
-
                 OrderInfoCard(order: order),
-
                 const SizedBox(height: 16),
-
                 PhotoCard(order: order),
-
                 const SizedBox(height: 16),
-
                 TimelineCard(order: order),
               ],
             ),

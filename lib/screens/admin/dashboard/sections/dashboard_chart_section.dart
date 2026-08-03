@@ -4,6 +4,16 @@ import '../../models/revenue_chart_model.dart';
 import '../../models/order_chart_model.dart';
 import '../../utils/admin_formatter.dart';
 
+/// Fungsi: Bagian Komponen Grafik Analitik Dashboard Admin.
+/// Cara Kerja:
+/// 1. Menerima data terformat `revenueData` dan `orderData` dari komponen induk dashboard.
+/// 2. Menggunakan `TabController` untuk memfasilitasi perpindahan visualisasi antargrafik (Grafik Pendapatan vs Grafik Total Order).
+/// 3. Memanfaatkan pustaka `fl_chart` untuk mengonversi model data menjadi grafik garis (`LineChart`) dan grafik batang (`BarChart`).
+/// 4. Mengatur batas skalar sumbu Y secara otomatis dan menyediakan tooltip interaktif saat data pada titik grafik disentuh/diklik.
+///
+/// Operasi Data & Presentasi:
+/// - File ini bersifat presentasional (Client-side Data Rendering) yang bertugas memetakan array model menjadi titik koordinat $X$ dan $Y$.
+/// - Mengonversi representasi bulan ($1..12$) menjadi titik indeks sumbu X berbasis nol ($0..11$).
 class DashboardChartSection extends StatefulWidget {
   final List<RevenueChartModel> revenueData;
   final List<OrderChartModel> orderData;
@@ -69,7 +79,6 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // PERBAIKAN 1: TabBar dibuat simetris & tidak overflow
                 Container(
                   height: 35,
                   width: 170,
@@ -79,7 +88,7 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
                   ),
                   child: TabBar(
                     controller: _tabController,
-                    isScrollable: false, // Membagi area rata (50:50)
+                    isScrollable: false,
                     padding: EdgeInsets.zero,
                     indicatorPadding: EdgeInsets.zero,
                     labelPadding: EdgeInsets.zero,
@@ -103,7 +112,7 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
             ),
             const SizedBox(height: 24),
             SizedBox(
-              height: 230, // Ditambah sedikit dari 220 ke 230
+              height: 230,
               child: TabBarView(
                 controller: _tabController,
                 children: [_buildRevenueChart(), _buildOrderChart()],
@@ -115,6 +124,11 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
     );
   }
 
+  /// Widget Builder: Membangun visualisasi grafik garis (LineChart) untuk trend akumulasi pendapatan bulanan.
+  /// Cara Kerja:
+  /// 1. Memetakan daftar `revenueData` ke dalam kumpulan titik `FlSpot(x, y)`.
+  /// 2. Menghitung nilai pendapatan tertinggi (`maxRevenue`) untuk menetapkan batas atas sumbu Y secara proporsional ($maxY = maxRevenue \times 1.4$).
+  /// 3. Mengatur format label angka sumbu Y menggunakan unit singkatan (K untuk Ribuan, M untuk Jutaan).
   Widget _buildRevenueChart() {
     if (widget.revenueData.isEmpty) {
       return const Center(child: Text("Tidak ada data"));
@@ -129,7 +143,6 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
       if (spot.y > maxRevenue) maxRevenue = spot.y;
     }
 
-    // PERBAIKAN 2: Menaikkan batas atas Y sebesar 40% (1.4) agar tooltip punya ruang cukup
     double maxY = maxRevenue > 0 ? maxRevenue * 1.4 : 10000;
 
     return LineChart(
@@ -204,7 +217,6 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            // PERBAIKAN 3: Memaksa tooltip agar muat di dalam layar (tidak terpotong ke luar)
             fitInsideHorizontally: true,
             fitInsideVertically: true,
             getTooltipColor: (touchedSpot) => Colors.green.shade800,
@@ -226,6 +238,11 @@ class _DashboardChartSectionState extends State<DashboardChartSection>
     );
   }
 
+  /// Widget Builder: Membangun visualisasi grafik batang (BarChart) untuk membandingkan total transaksi order antarbulan.
+  /// Cara Kerja:
+  /// 1. Mengonversi `orderData` menjadi baris objek `BarChartGroupData`.
+  /// 2. Mengatur elemen batang visual dengan indikator warna Oranye dan sudut melengkung pada bagian atas.
+  /// 3. Menampilkan tooltip melayang saat batang grafik ditekan untuk melihat jumlah pasti order.
   Widget _buildOrderChart() {
     if (widget.orderData.isEmpty) {
       return const Center(child: Text("Tidak ada data"));

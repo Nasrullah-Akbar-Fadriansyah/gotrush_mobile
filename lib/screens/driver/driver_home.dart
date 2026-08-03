@@ -12,6 +12,22 @@ import '../../services/notification_service.dart';
 import '../order_history_widget.dart';
 import '../order_room_screen.dart';
 
+/// Fungsi: Dasbor/Halaman Utama untuk Driver (Driver Home Screen).
+/// Cara Kerja:
+/// 1. Menginisialisasi pemantauan pesanan baru hari ini serta pesanan aktif mitra driver melalui Firestore Realtime Stream.
+/// 2. Mengoperasikan pembaruan posisi geolokasi GPS driver secara berkala (Timer 10 detik) ke Firestore untuk fitur pelacakan langsung.
+/// 3. Menampilkan indikator badging jumlah pesanan baru dan memicu BottomSheet Notifikasi jika ada pesanan masuk.
+/// 4. Menyediakan navigasi menu utama: Pesanan Baru, Riwayat, Status Online, dan Profil Driver.
+///
+/// Operasi CRUD (Read & Update/Set):
+/// - Read (Stream Realtime):
+///   - Memantau pesanan status 'pending' belum ber-driver untuk hari ini.
+///     - Sintaks: `FirebaseFirestore.instance.collection('orders').where('status', isEqualTo: 'pending').where('driver_id', isNull: true)...snapshots()`
+///   - Memantau pesanan aktif yang ditangani oleh driver saat ini.
+///     - Sintaks: `FirebaseFirestore.instance.collection('orders').where('driver_id', isEqualTo: driverUid).where('archived', isEqualTo: false).where('status', whereIn: [...]).snapshots()`
+/// - Update/Set (Location Tracking):
+///   - Memperbarui koordinat lokasi driver terbaru ke koleksi `drivers_location`.
+///     - Sintaks: `FirebaseFirestore.instance.collection('drivers_location').doc(driverUid).set({'location': GeoPoint(lat, lng), 'timestamp': Timestamp.now()}, SetOptions(merge: true))`
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
   @override
@@ -27,11 +43,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   String? _activeOrderId;
   final Map<String, String> _previousStatusPerOrder = {};
   String? _lastNavigatedOrderId;
+
+  /// Fungsi Helper: Mengembalikan timestamp batas awal hari ini (00:00:00).
   DateTime _startOfToday() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
   }
 
+  /// Fungsi Helper: Mengembalikan timestamp batas akhir hari ini (23:59:59).
   DateTime _endOfToday() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day, 23, 59, 59);
@@ -52,6 +71,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     super.dispose();
   }
 
+  /// Widget Builder: Membangun badge angka merah pada kartu "Pesanan Baru" berdasarkan jumlah order hari ini.
+  /// Operasi CRUD (Read Stream):
+  /// - Sintaks: `FirebaseFirestore.instance.collection('orders').where('status', whereIn: ['pending'])...snapshots()`
   Widget _buildTodayOrderBadge() {
     final startToday = Timestamp.fromDate(_startOfToday());
     final endToday = Timestamp.fromDate(_endOfToday());
@@ -96,6 +118,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
+  /// Fungsi: Memulai listener Firestore real-time dan periodic timer pelacakan lokasi GPS driver.
+  /// Operasi CRUD (Read Stream & Periodic Set):
+  /// - Memantau pesanan masuk & status pesanan aktif driver.
+  /// - Mengirim koordinat lokasi driver per 10 detik saat status order = 'active'.
   Future<void> _startListeningAndTracking() async {
     final auth = Provider.of<AuthService>(context, listen: false);
     final driverUid = auth.currentUser?.uid;
@@ -222,6 +248,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     });
   }
 
+  /// Fungsi: Mengambil posisi GPS perangkat terkini dan memperbaruinya ke Firestore.
+  /// Operasi CRUD (Update/Set):
+  /// - Sintaks: `FirebaseFirestore.instance.collection('drivers_location').doc(driverUid).set(driverLocation, SetOptions(merge: true))`
   Future<void> _updateDriverLocation(String driverUid) async {
     try {
       const LocationSettings locationSettings = LocationSettings(
@@ -247,6 +276,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  /// Fungsi: Menampilkan dialog bottom sheet pemberitahuan pesanan baru.
   Future<void> _showNewOrdersNotification() async {
     if (_showingDialog) return;
     _showingDialog = true;
@@ -500,6 +530,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 final driverUid = auth.currentUser?.uid;
                 if (driverUid == null) return const SizedBox.shrink();
 
+                /// Operasi CRUD (Read Stream):
+                /// Memeriksa keberadaan pesanan aktif untuk menampilkan tombol pintas ke Order Room.
+                /// - Sintaks: `FirebaseFirestore.instance.collection('orders').where('driver_id', isEqualTo: driverUid)...limit(1).snapshots()`
                 return StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('orders')
@@ -573,6 +606,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
+  /// Helper Builder: Membangun kartu menu utama pada dashboard driver.
   Widget _buildMenuCard(
     BuildContext context, {
     required String title,

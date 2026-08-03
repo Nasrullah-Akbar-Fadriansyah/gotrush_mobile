@@ -3,6 +3,15 @@ import 'full_image_page.dart';
 import '../../models/order_detail_model.dart';
 import '../../widgets/info_card.dart';
 
+/// Fungsi: Kartu Galeri Foto Sampah Lapangan (Photo Card Widget).
+/// Cara Kerja:
+/// 1. Menerima `order.photoUrls` yang berisi daftar URL gambar buktikan penjemputan sampah dari Firebase Storage.
+/// 2. Jika tidak ada foto, merender pesan empty state ("Tidak ada foto.").
+/// 3. Jika tersedia, merender tata letak Grid 2 kolom (`GridView.builder`) berisi foto bersudut tumpul (*rounded border*).
+/// 4. Saat salah satu foto ditekan, navigasi berpindah ke `FullImagePage` menggunakan transisi animasi `Hero`.
+///
+/// Operasi Data & Presentasi:
+/// - Membaca dan melakukankan iterasi array `order.photoUrls`.
 class PhotoCard extends StatelessWidget {
   final OrderDetailModel order;
 

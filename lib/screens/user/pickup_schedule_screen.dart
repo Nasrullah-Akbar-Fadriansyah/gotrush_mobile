@@ -9,6 +9,20 @@ import '../../payment.dart';
 import '../../midtrans_payment_webview.dart';
 import '../../services/notification_service.dart';
 
+/// Fungsi: Halaman Jadwal Penjemputan Sampah Pengguna.
+/// Cara Kerja:
+/// 1. Membaca UID pengguna aktif via Provider `AuthService`.
+/// 2. Mengambil daftar pesanan aktif yang memiliki tanggal penjemputan mendatang menggunakan Firestore Realtime Stream (`StreamBuilder`).
+/// 3. Memunculkan tombol pembayaran Snap Midtrans jika pesanan berada dalam tahap `waiting_payment`.
+/// 4. Membuka `MidtransPaymentWebView` dan memperbarui status pembayaran di Firestore serta mengirimkan notifikasi ke Driver saat pembayaran berhasil.
+///
+/// Operasi CRUD (Read & Update):
+/// - Read (Stream): Berlangganan daftar pesanan aktif milik pengguna dari koleksi `orders`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').where('user_id', isEqualTo: currentUserId).where('status', whereIn: [...]).orderBy('pickup_date', descending: false).snapshots()`
+/// - Update (Merge Document): Memperbarui atribut status pembayaran (`payment_status`) pada dokumen pesanan setelah transaksi Midtrans sukses.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(order.id).set({'payment_status': 'success'}, SetOptions(merge: true))`
+/// - Read (Document Lookup): Mengambil detail dokumen pesanan terbaru untuk memverifikasi `driver_id`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(order.id).get()`
 class PickupScheduleScreen extends StatelessWidget {
   const PickupScheduleScreen({super.key});
 
@@ -249,6 +263,7 @@ class PickupScheduleScreen extends StatelessWidget {
     );
   }
 
+  /// Fungsi Helper: Mengembalikan skema warna label status pesanan.
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':

@@ -8,6 +8,20 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geocoding/geocoding.dart';
 
+/// Fungsi: Antarmuka percakapan (Chat Room) real-time antara Pengguna dan Driver terkait pesanan tertentu.
+/// Cara Kerja:
+/// 1. Saat inisialisasi (`initState`), memanggil `_resetUnreadCounter` untuk mereset jumlah pesan belum dibaca.
+/// 2. Merender daftar pesan secara *real-time* dari Firestore sub-koleksi pesan menggunakan `StreamBuilder`.
+/// 3. Otomatis menandai pesan dari lawan bicara sebagai "dibaca" (`markAsRead`) saat pesan muncul di layar.
+/// 4. Memfasilitasi pengiriman pesan teks biasa maupun koordinat lokasi GPS fisik (berupa alamat lengkap dan tombol Google Maps).
+///
+/// Operasi CRUD (Read, Create, Update):
+/// - Read (Stream): Mengambil daftar pesan real-time berdasarkan `orderId` via `_chatService.getMessages(orderId)`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(orderId).collection('messages').orderBy('timestamp', descending: true).snapshots()`
+/// - Create (Insert): Mengirim pesan teks via `_sendMessage()` atau kirim lokasi via `_sendLocation()`.
+///   - Sintaks: `collection('messages').add(...)`
+/// - Update: Memperbarui status baca pesan (`readAt`) dan memperbarui metadata unread counter via `_chatService.markAsRead()`.
+///   - Sintaks: `collection('messages').doc(messageId).update({'readAt': FieldValue.serverTimestamp()})`
 class ChatScreen extends StatefulWidget {
   final String orderId;
   final String otherUserName;
@@ -25,14 +39,6 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  // String _buildMapPreviewUrl(double lat, double lng) {
-  //   return "https://staticmap.openstreetmap.de/staticmap.php"
-  //       "?center=$lat,$lng"
-  //       "&zoom=15"
-  //       "&size=600x300"
-  //       "&markers=$lat,$lng,red-pushpin";
-  // }
-
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -45,6 +51,11 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  /// Fungsi: Mereset jumlah pesan yang belum dibaca (unread count) untuk pengguna saat ini.
+  /// Cara Kerja: Memanggil method `resetUnreadCounter` pada layanan `_chatService` dengan menyertakan `orderId` dan peran pengguna.
+  /// Operasi CRUD (Update):
+  /// - Memperbarui field counter `unread_user` atau `unread_driver` menjadi 0 pada dokumen metadata percakapan.
+  ///   - Sintaks: `doc(orderId).collection('chat_meta').doc('meta').update({'unread_user': 0})`
   void _resetUnreadCounter() async {
     await _chatService.resetUnreadCounter(
       widget.orderId,
@@ -59,6 +70,17 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  /// Fungsi: Mengirimkan pesan teks baru dari input pengguna ke server Firebase.
+  /// Cara Kerja:
+  /// 1. Mengambil teks dari `_messageController`, memvalidasi agar tidak kosong.
+  /// 2. Mengambil ID pengguna aktif dari `AuthService`.
+  /// 3. Mengosongkan field input, lalu memanggil `_chatService.sendMessage`.
+  /// 4. Memicu animasi *scroll* ke bagian bawah layar chat (`_scrollToBottom`).
+  /// Operasi CRUD (Create & Update):
+  /// - Create: Menambahkan dokumen baru ke sub-koleksi `messages`.
+  ///   - Sintaks: `collection('orders').doc(orderId).collection('messages').add(messageData)`
+  /// - Update: Mengatur atribut pesan terakhir (`lastMessage`) dan menambah counter `unread` lawan bicara di dokumen induk/meta.
+  ///   - Sintaks: `doc(orderId).update({'last_message': text, 'chat_meta.unread_driver': FieldValue.increment(1)})`
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -79,6 +101,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  /// Fungsi: Mengonversi koordinat latitude & longitude menjadi nama jalan/alamat manusiawi (Reverse Geocoding).
+  /// Cara Kerja: Memanggil fungsi `placemarkFromCoordinates` dari paket `geocoding`, lalu menyusun string alamat berdasarkan nama jalan, kelurahan, dan kecamatan.
   Future<String> _getAddress(double lat, double lng) async {
     try {
       final placemarks = await placemarkFromCoordinates(lat, lng);
@@ -95,6 +119,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Fungsi: Mengambil posisi lokasi GPS saat ini dan mengirimkannya sebagai pesan tipe lokasi.
+  /// Cara Kerja:
+  /// 1. Menguji dan meminta izin akses lokasi ke perangkat (`Geolocator.requestPermission`).
+  /// 2. Mengambil posisi koordinat terkini (`Geolocator.getCurrentPosition`).
+  /// 3. Mengirimkan latitude dan longitude melalui `_chatService.sendLocation`.
+  /// Operasi CRUD (Create):
+  /// - Menambahkan dokumen pesan tipe lokasi ke Firestore.
+  ///   - Sintaks: `collection('messages').add({'type': 'location', 'latitude': lat, 'longitude': lng, ...})`
   Future<void> _sendLocation() async {
     final auth = Provider.of<AuthService>(context, listen: false);
     final user = auth.currentUser;
@@ -130,6 +162,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  /// Fungsi: Membuka aplikasi eksternal Google Maps berdasarkan koordinat latitude & longitude.
+  /// Cara Kerja: Mengonversi URL query Google Maps, mengecek kemampuan perangkat (`canLaunchUrl`), lalu membukanya di aplikasi peta luar via `launchUrl`.
   Future<void> _openMap(double lat, double lng) async {
     final Uri uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
@@ -140,6 +174,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Fungsi: Menggulirkan daftar pesan ke posisi paling bawah (pesan terbaru).
+  /// Cara Kerja: Menggunakan `_scrollController.animateTo` menuju `minScrollExtent` karena `ListView` diset dengan `reverse: true`.
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -183,6 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     )
                     .toList();
 
+                // Memeriksa dan memperbarui status read pesan dari lawan bicara
                 for (var msg in messages) {
                   if (msg.senderRole != widget.currentUserRole &&
                       msg.readAt == null) {
@@ -210,6 +247,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Widget Builder: Memilih tampilan balok pesan (gelembung chat) berdasarkan jenis pesan (teks biasa / lokasi).
   Widget _messageBubble(ChatMessage msg, bool isMe) {
     if (msg.type == 'location') {
       return _locationMessageBubble(msg, isMe);
@@ -239,6 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Widget Builder: Menampilkan timestamp pengiriman dan status terbaca (ikon centang 1 atau centang 2 biru).
   Widget _messageFooter(ChatMessage msg, bool isMe) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -262,6 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Widget Builder: Tampilan gelembung pesan khusus lokasi penjemputan dengan integrasi FutureBuilder untuk reverse-geocoding alamat.
   Widget _locationMessageBubble(ChatMessage msg, bool isMe) {
     final lat = msg.latitude!;
     final lng = msg.longitude!;
@@ -455,6 +495,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Widget Builder: Membangun baris input pesan bagian bawah yang dilengkapi tombol kirim lokasi GPS dan tombol kirim teks.
   Widget _buildInput() {
     return Padding(
       padding: const EdgeInsets.all(8),
@@ -480,6 +521,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Fungsi: Mengubah format `Timestamp` Firebase menjadi string waktu jam dan menit (`HH:mm`).
   String _formatTime(Timestamp ts) {
     final d = ts.toDate();
     return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

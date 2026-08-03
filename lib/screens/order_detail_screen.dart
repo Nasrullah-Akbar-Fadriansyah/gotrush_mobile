@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'chat_screen.dart';
 
-// Helper untuk mendapatkan warna berdasarkan status
+/// Fungsi Helper: Menentukan warna latar belakang status pesanan berdasarkan kata kunci statusnya.
 Color _getStatusColor(String status) {
   switch (status.toLowerCase()) {
     case 'completed':
@@ -36,6 +36,17 @@ extension ColorExtension on Color {
   }
 }
 
+/// Fungsi: Halaman rincian lengkap pesanan (Order Detail Screen).
+/// Cara Kerja:
+/// 1. Menerima data awal pesanan dari widget induk dan mendengarkan pembaruan dokumen real-time dari Firestore (`StreamBuilder`).
+/// 2. Menampilkan informasi detail pengguna, profil driver (jika ada), berat awal vs berat final, rincian pembayaran, serta riwayat waktu penjemputan.
+/// 3. Menyediakan tombol navigasi ke layar percakapan (`ChatScreen`) yang dilengkapi dengan indikator badge pesan belum dibaca (*unread count*).
+///
+/// Operasi CRUD (Read):
+/// - Read 1 (Stream): Berlangganan status dan rincian dokumen pesanan saat ini.
+///   - Sintaks: `FirebaseFirestore.instance.collection('orders').doc(orderId).snapshots()`
+/// - Read 2 (Future): Mengambil profil data driver dari koleksi `users`.
+///   - Sintaks: `FirebaseFirestore.instance.collection('users').doc(driverId).get()`
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
   final String orderId;
@@ -336,6 +347,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  /// Widget Builder: Menyusun aksi tombol AppBar berupa ikon chat lengkap dengan lonceng/badge unread counter.
   List<Widget> _buildAppBarActions(BuildContext context, String status) {
     final chatStatuses = [
       'active',
@@ -385,6 +397,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return [chatButton];
   }
 
+  /// Fungsi: Menentukan ID/nama pengguna saat ini dan mengarahkan navigasi ke layar `ChatScreen`.
   void _openChat(BuildContext context) {
     final auth = Provider.of<AuthService>(context, listen: false);
     final currentUser = auth.currentUser;
